@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { filename, contentType, fileSize } = body;
+    const { filename, contentType, fileSize, takenAt } = body;
 
     // Validate required fields
     if (!filename || !contentType) {
@@ -44,8 +44,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate file path
-    const uploadDate = new Date();
+    // Generate file path using EXIF date if available, otherwise current date
+    const uploadDate = takenAt ? new Date(takenAt) : new Date();
+    console.log(`Generating presigned URL for ${filename} with date: ${uploadDate.toISOString()} (${uploadDate.getFullYear()}/${String(uploadDate.getMonth() + 1).padStart(2, '0')})`);
     const filePath = generateFilePath.original(uploadDate, filename);
 
     // Generate presigned URL (15 minute expiration)

@@ -60,7 +60,7 @@ export async function requireAuth() {
  * Check if an email address should be an admin
  */
 export function isAdminEmail(email: string): boolean {
-  const adminEmails = process.env.ADMIN_EMAILS?.split(',') || []
+  const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(email => email.trim()) || []
   return adminEmails.includes(email)
 }
 

@@ -10,7 +10,8 @@ import CryptoJS from 'crypto-js';
 export async function processMediaMetadata(
   file: File,
   uploadedBy: string,
-  uploadSource: 'web' | 'whatsapp' | 'email' = 'web'
+  uploadSource: 'web' | 'whatsapp' | 'email' = 'web',
+  preExtractedExifData?: ExifMetadata | null
 ): Promise<{
   metadata: Omit<MediaMetadata, 'id' | 'path' | 'thumbnailPath'>;
   fileNaming: FileNamingResult;
@@ -21,9 +22,16 @@ export async function processMediaMetadata(
   // Generate file hash for duplicate detection
   const hash = await generateFileHash(file);
   
-  // Extract EXIF metadata for images
+  // Use pre-extracted EXIF data if provided, otherwise extract it
   let exifData: ExifMetadata | null = null;
-  if (file.type.startsWith('image/')) {
+  if (preExtractedExifData !== undefined) {
+    exifData = preExtractedExifData;
+    console.log(`Using pre-extracted EXIF data for ${file.name}:`, {
+      hasData: !!exifData,
+      hasDate: !!exifData?.dateTimeOriginal,
+      camera: exifData?.make && exifData?.model ? `${exifData.make} ${exifData.model}` : 'Unknown'
+    });
+  } else if (file.type.startsWith('image/')) {
     exifData = await extractExifMetadata(file);
   }
   

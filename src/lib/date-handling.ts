@@ -11,8 +11,21 @@ export async function processDateWithFallbacks(
   file: File,
   exifData?: ExifMetadata | null
 ): Promise<DateProcessingResult> {
+  console.log(`Processing date for ${file.name}:`, {
+    hasExifData: !!exifData,
+    hasDateTimeOriginal: !!exifData?.dateTimeOriginal,
+    hasDateTime: !!exifData?.dateTime,
+    hasDateTimeDigitized: !!exifData?.dateTimeDigitized,
+    exifDates: {
+      dateTimeOriginal: exifData?.dateTimeOriginal,
+      dateTime: exifData?.dateTime,
+      dateTimeDigitized: exifData?.dateTimeDigitized
+    }
+  });
+
   // Strategy 1: Use EXIF DateTimeOriginal (highest priority)
   if (exifData?.dateTimeOriginal) {
+    console.log(`Using EXIF DateTimeOriginal for ${file.name}: ${exifData.dateTimeOriginal}`);
     return {
       takenAt: exifData.dateTimeOriginal,
       dateSource: 'exif',
@@ -23,6 +36,7 @@ export async function processDateWithFallbacks(
   
   // Strategy 2: Use other EXIF date fields
   if (exifData?.dateTime) {
+    console.log(`Using EXIF DateTime for ${file.name}: ${exifData.dateTime}`);
     return {
       takenAt: exifData.dateTime,
       dateSource: 'exif',
@@ -32,6 +46,7 @@ export async function processDateWithFallbacks(
   }
   
   if (exifData?.dateTimeDigitized) {
+    console.log(`Using EXIF DateTimeDigitized for ${file.name}: ${exifData.dateTimeDigitized}`);
     return {
       takenAt: exifData.dateTimeDigitized,
       dateSource: 'exif',
@@ -43,6 +58,7 @@ export async function processDateWithFallbacks(
   // Strategy 3: Extract date from filename
   const filenameDate = extractDateFromFilename(file.name);
   if (filenameDate) {
+    console.log(`Using filename date for ${file.name}: ${filenameDate}`);
     return {
       takenAt: filenameDate,
       dateSource: 'filename',
@@ -53,6 +69,7 @@ export async function processDateWithFallbacks(
   // Strategy 4: Use file lastModified as fallback
   const fileDate = new Date(file.lastModified);
   if (!isNaN(fileDate.getTime()) && fileDate.getFullYear() > 2000) {
+    console.log(`Using file lastModified for ${file.name}: ${fileDate}`);
     return {
       takenAt: fileDate,
       dateSource: 'file-creation',
@@ -61,6 +78,7 @@ export async function processDateWithFallbacks(
   }
   
   // Strategy 5: Use current upload time as last resort
+  console.log(`Using current time as fallback for ${file.name}`);
   return {
     takenAt: new Date(),
     dateSource: 'upload-time',

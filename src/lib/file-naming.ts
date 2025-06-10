@@ -4,6 +4,8 @@ import { FileNamingResult } from '@/types/media';
  * Generate unique filename and path based on date
  */
 export function generateUniqueFilename(originalFilename: string, takenAt: Date): FileNamingResult {
+  console.log(`Generating filename for ${originalFilename} with date: ${takenAt.toISOString()} (${takenAt.getFullYear()}/${String(takenAt.getMonth() + 1).padStart(2, '0')})`);
+  
   const year = takenAt.getFullYear();
   const month = String(takenAt.getMonth() + 1).padStart(2, '0');
   const timestamp = Math.floor(takenAt.getTime() / 1000);
@@ -215,5 +217,5 @@ export function generateStoragePath(date: Date, type: 'originals' | 'thumbnails'
  */
 export function getMetadataJsonPath(date: Date): string {
   const year = date.getFullYear();
-  return `data/media/${year}.json`;
+  return `media/${year}.json`;
 } 

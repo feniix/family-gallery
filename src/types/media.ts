@@ -94,13 +94,18 @@ export interface MediaMetadata {
   metadata: {
     width?: number;
     height?: number;
-    duration?: number;
+    duration?: number; // For videos
     size: number;
     camera?: string;
     location?: { lat: number; lng: number };
     // Enhanced metadata from EXIF
     exif?: ExifMetadata;
     hash: string; // For duplicate detection
+    // Video-specific metadata
+    videoCodec?: string;
+    audioCodec?: string;
+    bitrate?: number;
+    framerate?: number;
   };
   subjects: string[];
   tags: string[];
@@ -109,6 +114,9 @@ export interface MediaMetadata {
   isScreenshot?: boolean;
   isEdited?: boolean;
   hasValidExif?: boolean;
+  // Video processing flags
+  thumbnailGenerated?: boolean;
+  videoProcessingFailed?: boolean;
 }
 
 /**

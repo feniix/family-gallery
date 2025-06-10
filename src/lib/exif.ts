@@ -68,20 +68,41 @@ const EXIF_OPTIONS = {
  */
 export async function extractExifMetadata(file: File): Promise<ExifMetadata | null> {
   try {
-    // Skip EXIF extraction on server side for now
-    // In Stage 2.3, we'll implement proper server-side EXIF extraction
-    if (isServerSide()) {
-      console.log(`Skipping EXIF extraction on server side for ${file.name}`);
+    // Check if we're in a browser environment where EXIF extraction is supported
+    if (isServerSide() || typeof document === 'undefined') {
+      console.log(`Skipping EXIF extraction - not in browser environment for ${file.name}`);
       return null;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const exifData = await (exifr as any).parse(file, EXIF_OPTIONS);
+    // Ensure exifr is available
+    if (!exifr || typeof exifr.parse !== 'function') {
+      console.warn(`EXIF library not available or invalid for ${file.name}`);
+      return null;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      console.log(`Skipping EXIF extraction - not an image file: ${file.name}`);
+      return null;
+    }
+
+    console.log(`Extracting EXIF data from ${file.name} (${file.type}, ${file.size} bytes)`);
+
+    // Extract EXIF data using exifr
+    const exifData = await exifr.parse(file, EXIF_OPTIONS);
     
-    if (!exifData) {
+    if (!exifData || Object.keys(exifData).length === 0) {
       console.log(`No EXIF data found in ${file.name}`);
       return null;
     }
+
+    console.log(`Successfully extracted EXIF data from ${file.name}:`, {
+      hasDateTimeOriginal: !!exifData.DateTimeOriginal,
+      hasMake: !!exifData.Make,
+      hasModel: !!exifData.Model,
+      hasGPS: !!(exifData.GPSLatitude && exifData.GPSLongitude),
+      fieldCount: Object.keys(exifData).length
+    });
 
     // Process GPS coordinates
     const gps = extractGpsCoordinates(exifData);
@@ -278,8 +299,8 @@ function parseExifDate(dateValue: any): Date | null {
     console.warn('Unable to parse EXIF date:', dateValue);
     return null;
     
-  } catch (error) {
-    console.error('Error parsing EXIF date:', error);
+  } catch {
+    console.error('Error parsing EXIF date:');
     return null;
   }
 }
@@ -407,4 +428,54 @@ export function getTimezoneFromCoordinates(latitude: number, longitude: number):
   }
   
   return null;
+}
+
+/**
+ * Test EXIF extraction capabilities - useful for debugging
+ */
+export async function testExifExtraction(): Promise<{
+  isSupported: boolean;
+  libraryAvailable: boolean;
+  browserCompatible: boolean;
+  error?: string;
+}> {
+  try {
+    const result = {
+      isSupported: false,
+      libraryAvailable: !!exifr && typeof exifr.parse === 'function',
+      browserCompatible: !isServerSide() && typeof document !== 'undefined',
+      error: undefined as string | undefined
+    };
+
+    if (!result.libraryAvailable) {
+      result.error = 'EXIF library (exifr) is not available or invalid';
+      return result;
+    }
+
+    if (!result.browserCompatible) {
+      result.error = 'Not running in a browser environment';
+      return result;
+    }
+
+    // Try to create a simple test image with some metadata
+    // This is a simple way to test if the library works
+    try {
+      // Test if the library function exists and is callable
+      if (typeof exifr.parse === 'function') {
+        result.isSupported = true;
+      }
+    } catch {
+      result.isSupported = false;
+    }
+
+    return result;
+
+  } catch {
+    return {
+      isSupported: false,
+      libraryAvailable: false,
+      browserCompatible: !isServerSide() && typeof document !== 'undefined',
+      error: 'Unknown error'
+    };
+  }
 } 

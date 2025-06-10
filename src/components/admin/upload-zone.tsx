@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Upload, FileImage, FileVideo, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { validateVideoFile } from '@/lib/video-processing'
 
 interface UploadZoneProps {
   onFilesSelected: (files: File[]) => void
@@ -26,9 +27,23 @@ export function UploadZone({
   // Validate file type
   const isValidFileType = useCallback((file: File): boolean => {
     const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
-    const validVideoTypes = ['video/mp4', 'video/quicktime', 'video/avi', 'video/mov']
     
-    return validImageTypes.includes(file.type) || validVideoTypes.includes(file.type)
+    // For images, check MIME type
+    if (validImageTypes.includes(file.type)) {
+      return true
+    }
+    
+    // For videos, use the video validation function
+    if (file.type.startsWith('video/')) {
+      const validation = validateVideoFile(file)
+      if (!validation.isValid) {
+        toast.error(`Video file "${file.name}": ${validation.error}`)
+        return false
+      }
+      return true
+    }
+    
+    return false
   }, [])
 
   // Validate file size

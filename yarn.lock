@@ -2978,6 +2978,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/video.js@npm:^7.3.58":
+  version: 7.3.58
+  resolution: "@types/video.js@npm:7.3.58"
+  checksum: 10c0/b8c37da50855957e95b706e67987b51be6921afa6e2d8beb4b15258554ba6d39854b6b680b9ebfce0c039a07033a308f6656c4d6b987cfa778b16f6cf1a14776
+  languageName: node
+  linkType: hard
+
 "@typescript-eslint/eslint-plugin@npm:^5.4.2 || ^6.0.0 || ^7.0.0 || ^8.0.0, @typescript-eslint/eslint-plugin@npm:^8.34.0":
   version: 8.34.0
   resolution: "@typescript-eslint/eslint-plugin@npm:8.34.0"
@@ -4543,6 +4550,7 @@ __metadata:
     "@types/node-cache": "npm:^4.2.5"
     "@types/react": "npm:^19.1.7"
     "@types/react-dom": "npm:^19.1.6"
+    "@types/video.js": "npm:^7.3.58"
     "@typescript-eslint/eslint-plugin": "npm:^8.34.0"
     "@typescript-eslint/parser": "npm:^8.34.0"
     "@uppy/core": "npm:^4.4.6"

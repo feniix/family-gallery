@@ -11,11 +11,16 @@ export async function checkForDuplicate(
   excludeYears: number[] = []
 ): Promise<DuplicateCheckResult> {
   try {
+    console.log(`[DUPLICATE SEARCH] Checking for hash: ${hash.substring(0, 16)}... with date: ${uploadDate.toISOString()}`)
+    
     // Check current year first
     const currentYear = uploadDate.getFullYear();
+    console.log(`[DUPLICATE SEARCH] Checking current year: ${currentYear}`)
+    
     const currentYearResult = await checkYearForDuplicate(hash, currentYear);
     
     if (currentYearResult.isDuplicate) {
+      console.log(`[DUPLICATE SEARCH] Found duplicate in current year ${currentYear}`)
       return currentYearResult;
     }
     
@@ -24,17 +29,22 @@ export async function checkForDuplicate(
       year => !excludeYears.includes(year) && year >= 2000 && year <= new Date().getFullYear() + 1
     );
     
+    console.log(`[DUPLICATE SEARCH] Also checking adjacent years: ${yearsToCheck.join(', ')}`)
+    
     for (const year of yearsToCheck) {
+      console.log(`[DUPLICATE SEARCH] Checking year ${year}...`)
       const yearResult = await checkYearForDuplicate(hash, year);
       if (yearResult.isDuplicate) {
+        console.log(`[DUPLICATE SEARCH] Found duplicate in year ${year}`)
         return yearResult;
       }
     }
     
+    console.log(`[DUPLICATE SEARCH] No duplicates found for hash ${hash.substring(0, 16)}...`)
     return { isDuplicate: false, hash };
     
   } catch (error) {
-    console.error('Error checking for duplicates:', error);
+    console.error('[DUPLICATE SEARCH] Error checking for duplicates:', error);
     // In case of error, assume not duplicate to allow upload
     return { isDuplicate: false, hash };
   }
@@ -46,19 +56,32 @@ export async function checkForDuplicate(
 async function checkYearForDuplicate(hash: string, year: number): Promise<DuplicateCheckResult> {
   try {
     const jsonPath = getMetadataJsonPath(new Date(year, 0, 1));
+    console.log(`[DUPLICATE YEAR SEARCH] Checking ${year}: looking for file at ${jsonPath}`)
+    
     const yearData = await readJsonFile(jsonPath);
     
     if (!yearData || !yearData.media || !Array.isArray(yearData.media)) {
+      console.log(`[DUPLICATE YEAR SEARCH] No data found for year ${year} (file doesn't exist or empty)`)
       return { isDuplicate: false, hash };
     }
     
+    console.log(`[DUPLICATE YEAR SEARCH] Found ${yearData.media.length} media items in ${year} database`)
+    
+    // Log all files in this year for debugging
+    console.log(`[DUPLICATE YEAR SEARCH] Files in ${year} database:`)
+    yearData.media.forEach((media: MediaMetadata, index: number) => {
+      console.log(`  ${index + 1}. ${media.originalFilename} - Hash: ${media.metadata?.hash?.substring(0, 16)}... - Date: ${media.takenAt}`)
+    })
+    
     // Search for existing media with the same hash
-    const existingMedia = yearData.media.find((media: MediaMetadata) => 
-      media.metadata?.hash === hash
-    );
+    const existingMedia = yearData.media.find((media: MediaMetadata) => {
+      const mediaHash = media.metadata?.hash;
+      console.log(`[DUPLICATE YEAR SEARCH] Comparing hash ${hash.substring(0, 16)}... with ${mediaHash?.substring(0, 16)}... (${media.originalFilename})`);
+      return mediaHash === hash;
+    });
     
     if (existingMedia) {
-      console.log(`Duplicate found: ${existingMedia.originalFilename} (${existingMedia.id})`);
+      console.log(`[DUPLICATE YEAR SEARCH] ✅ DUPLICATE FOUND: ${existingMedia.originalFilename} (${existingMedia.id})`);
       return {
         isDuplicate: true,
         existingMedia,
@@ -66,11 +89,12 @@ async function checkYearForDuplicate(hash: string, year: number): Promise<Duplic
       };
     }
     
+    console.log(`[DUPLICATE YEAR SEARCH] No matching hash found in ${year} database`)
     return { isDuplicate: false, hash };
     
   } catch (error) {
     // If file doesn't exist or can't be read, no duplicates in this year
-    console.log(`No metadata file for year ${year} or error reading:`, error instanceof Error ? error.message : 'Unknown error');
+    console.log(`[DUPLICATE YEAR SEARCH] Error reading ${year} database:`, error instanceof Error ? error.message : 'Unknown error');
     return { isDuplicate: false, hash };
   }
 }

@@ -33,25 +33,46 @@ export interface JsonDbOperation<T = any> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function readJsonFile<T = any>(filename: string): Promise<T | null> {
   try {
+    console.log(`[READ JSON] Attempting to read: ${filename}`)
     const client = ensureR2Client();
     const key = generateFilePath.jsonData(filename);
+    console.log(`[READ JSON] Generated R2 key: ${key}`)
+    
     const command = new GetObjectCommand({
       Bucket: r2Config.bucketName,
       Key: key,
     });
 
+    console.log(`[READ JSON] Sending GetObject command for: ${key}`)
     const response = await client.send(command);
+    console.log(`[READ JSON] GetObject response status: ${response.$metadata.httpStatusCode}`)
     
     if (!response.Body) {
+      console.log(`[READ JSON] No body in response for: ${filename}`)
       return null;
     }
 
     const bodyString = await response.Body.transformToString();
-    return JSON.parse(bodyString) as T;
+    console.log(`[READ JSON] Successfully read ${filename}, content length: ${bodyString.length}`)
+    
+    const parsed = JSON.parse(bodyString) as T;
+    if (parsed && typeof parsed === 'object' && 'media' in parsed) {
+      console.log(`[READ JSON] Parsed ${filename} with ${(parsed as any).media.length} media items`)
+    }
+    
+    return parsed;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
+    console.log(`[READ JSON] Error reading ${filename}:`, {
+      name: error.name,
+      code: error.code,
+      httpStatusCode: error.$metadata?.httpStatusCode,
+      message: error.message
+    })
+    
     // If file doesn't exist, return null
     if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      console.log(`[READ JSON] File ${filename} does not exist (NoSuchKey/404)`)
       return null;
     }
     throw error;

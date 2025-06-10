@@ -10,6 +10,9 @@ import { UploadZone } from '@/components/admin/upload-zone'
 import { UploadProgress } from '@/components/admin/upload-progress'
 import { Upload, Image, Video, FileText, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
+import { extractExifMetadata } from '@/lib/exif'
+import type { ExifMetadata, MediaMetadata } from '@/types/media'
+
 export interface UploadFile {
   id: string
   file: File
@@ -27,10 +30,13 @@ export interface UploadFile {
     existingDate: string
   }
   hash?: string
+  // Client-side extracted EXIF data
+  exifData?: ExifMetadata | null
+  exifExtracted?: boolean
 }
 
 export default function AdminUploadPage() {
-  const { isLoaded } = useUser()
+  const { isLoaded, user } = useUser()
   const isAdmin = useIsAdmin()
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([])
   const [isUploading, setIsUploading] = useState(false)
@@ -64,18 +70,109 @@ export default function AdminUploadPage() {
   }
 
   const handleFilesSelected = async (files: File[]) => {
+    console.log(`[CLIENT] === handleFilesSelected called with ${files.length} files ===`)
+    
     const newUploadFiles: UploadFile[] = files.map(file => ({
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       file,
       status: 'pending',
-      progress: 0
+      progress: 0,
+      exifExtracted: false
     }))
 
     setUploadFiles(prev => [...prev, ...newUploadFiles])
     toast.success(`${files.length} file(s) added to upload queue`)
 
-    // Check for duplicates via API call
-    await checkFilesForDuplicates(newUploadFiles)
+    console.log(`[CLIENT] About to start EXIF extraction for:`, newUploadFiles.map(f => f.file.name))
+
+    // Extract EXIF data for image files on the client side FIRST
+    const filesWithExif = await extractExifDataForFiles(newUploadFiles)
+
+    console.log(`[CLIENT] EXIF extraction completed, now checking duplicates`)
+
+    // THEN check for duplicates AFTER EXIF extraction is complete
+    // Use the updated files with EXIF data instead of the original array
+    await checkFilesForDuplicates(filesWithExif)
+    
+    console.log(`[CLIENT] === handleFilesSelected completed ===`)
+  }
+
+  const extractExifDataForFiles = async (filesToExtract: UploadFile[]): Promise<UploadFile[]> => {
+    const imageFiles = filesToExtract.filter(f => f.file.type.startsWith('image/'))
+    
+    if (imageFiles.length === 0) {
+      console.log('[CLIENT EXIF] No image files to process')
+      return filesToExtract
+    }
+
+    console.log(`[CLIENT EXIF] Starting EXIF extraction for ${imageFiles.length} image(s)`)
+    toast.info(`Extracting EXIF data from ${imageFiles.length} image(s)...`)
+
+    // Create a map to store updated files
+    const updatedFiles = new Map<string, UploadFile>()
+    
+    // Initialize with original files
+    filesToExtract.forEach(f => updatedFiles.set(f.id, f))
+
+    for (const uploadFile of imageFiles) {
+      try {
+        console.log(`[CLIENT EXIF] Processing ${uploadFile.file.name} (${uploadFile.file.type}, ${uploadFile.file.size} bytes)`)
+        const exifData = await extractExifMetadata(uploadFile.file)
+        
+        console.log(`[CLIENT EXIF] EXIF extraction result for ${uploadFile.file.name}:`, {
+          success: !!exifData,
+          hasDateTimeOriginal: exifData?.dateTimeOriginal ? true : false,
+          dateTimeOriginal: exifData?.dateTimeOriginal?.toISOString(),
+          make: exifData?.make,
+          model: exifData?.model,
+          fieldCount: exifData ? Object.keys(exifData).length : 0
+        })
+        
+        // Update the file in our local map
+        const updatedFile = { 
+          ...uploadFile, 
+          exifData,
+          exifExtracted: true
+        }
+        updatedFiles.set(uploadFile.id, updatedFile)
+        
+        // Also update the global state
+        setUploadFiles(prev => prev.map(f => 
+          f.id === uploadFile.id 
+            ? updatedFile
+            : f
+        ))
+
+        if (exifData) {
+          console.log(`[CLIENT EXIF] ✅ EXIF data extracted for ${uploadFile.file.name}:`, {
+            hasDate: !!exifData.dateTimeOriginal,
+            camera: exifData.make && exifData.model ? `${exifData.make} ${exifData.model}` : 'Unknown',
+            hasGPS: !!exifData.gps
+          })
+        } else {
+          console.log(`[CLIENT EXIF] ❌ No EXIF data found for ${uploadFile.file.name}`)
+        }
+
+      } catch (error) {
+        console.error(`[CLIENT EXIF] ❌ Failed to extract EXIF for ${uploadFile.file.name}:`, error)
+        // Mark as extracted even if failed, so we don't try again
+        const failedFile = { ...uploadFile, exifData: null, exifExtracted: true }
+        updatedFiles.set(uploadFile.id, failedFile)
+        
+        setUploadFiles(prev => prev.map(f => 
+          f.id === uploadFile.id 
+            ? failedFile
+            : f
+        ))
+      }
+    }
+
+    const successCount = imageFiles.length
+    console.log(`[CLIENT EXIF] ✅ EXIF extraction completed for ${successCount} image(s)`)
+    toast.success(`EXIF extraction completed for ${successCount} image(s)`)
+
+    // Return the updated files array
+    return Array.from(updatedFiles.values())
   }
 
   const checkFilesForDuplicates = async (filesToCheck: UploadFile[]) => {
@@ -85,9 +182,19 @@ export default function AdminUploadPage() {
     try {
       for (const uploadFile of filesToCheck) {
         try {
+          console.log(`[CLIENT] Checking duplicates for: ${uploadFile.file.name}`)
+          
           // Call API to check for duplicates instead of doing it client-side
           const formData = new FormData()
           formData.append('file', uploadFile.file)
+          
+          // Send EXIF data if available
+          if (uploadFile.exifData) {
+            formData.append('exifData', JSON.stringify(uploadFile.exifData))
+            console.log(`[CLIENT] Sending EXIF data for ${uploadFile.file.name}`)
+          } else {
+            console.log(`[CLIENT] No EXIF data available for ${uploadFile.file.name}`)
+          }
           
           const response = await fetch('/api/upload/check-duplicate', {
             method: 'POST',
@@ -96,6 +203,7 @@ export default function AdminUploadPage() {
 
           if (response.ok) {
             const result = await response.json()
+            console.log(`[CLIENT] Duplicate check result for ${uploadFile.file.name}:`, result)
             
             // Update file with duplicate info
             setUploadFiles(prev => prev.map(f => 
@@ -116,6 +224,9 @@ export default function AdminUploadPage() {
 
             if (result.isDuplicate) {
               duplicatesFound++
+              console.log(`[CLIENT] File ${uploadFile.file.name} marked as duplicate!`)
+            } else {
+              console.log(`[CLIENT] File ${uploadFile.file.name} is not a duplicate`)
             }
           } else {
             console.error(`Failed to check duplicate for ${uploadFile.file.name}`)
@@ -125,6 +236,8 @@ export default function AdminUploadPage() {
           // Continue with other files - don't block upload for duplicate check failures
         }
       }
+
+      console.log(`[CLIENT] Total duplicates found: ${duplicatesFound}`)
 
       if (duplicatesFound > 0) {
         toast.warning(
@@ -192,6 +305,18 @@ export default function AdminUploadPage() {
       // Update status to uploading
       updateFileStatus(uploadFile.id, 'uploading', 0)
 
+      // Determine the best date to use for file organization
+      let takenAt: string | undefined;
+      if (uploadFile.exifData?.dateTimeOriginal) {
+        takenAt = uploadFile.exifData.dateTimeOriginal.toISOString();
+      } else if (uploadFile.exifData?.dateTime) {
+        takenAt = uploadFile.exifData.dateTime.toISOString();
+      } else if (uploadFile.exifData?.dateTimeDigitized) {
+        takenAt = uploadFile.exifData.dateTimeDigitized.toISOString();
+      }
+      
+      console.log(`Requesting presigned URL for ${uploadFile.file.name} with date: ${takenAt || 'current date'}`);
+
       // Get presigned URL
       const response = await fetch('/api/upload/presigned', {
         method: 'POST',
@@ -199,7 +324,8 @@ export default function AdminUploadPage() {
         body: JSON.stringify({
           filename: uploadFile.file.name,
           contentType: uploadFile.file.type,
-          fileSize: uploadFile.file.size
+          fileSize: uploadFile.file.size,
+          takenAt
         })
       })
 
@@ -257,10 +383,71 @@ export default function AdminUploadPage() {
       }
 
       // Update status to processing
-      updateFileStatus(uploadFile.id, 'processing', 90)
+      updateFileStatus(uploadFile.id, 'processing', 70)
 
-      // TODO: Process metadata (EXIF, thumbnails) - this will be implemented in Stage 2.2
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate processing
+      // Process metadata and save to database
+      console.log(`Processing metadata for ${uploadFile.file.name}`)
+      
+             // Create media metadata
+       const mediaMetadata: MediaMetadata = {
+        id: crypto.randomUUID(),
+        filename: uploadFile.file.name.replace(/[^a-zA-Z0-9.-]/g, '_'), // Sanitize filename
+        originalFilename: uploadFile.file.name,
+        path: filePath,
+        type: uploadFile.file.type.startsWith('video/') ? 'video' as const : 'photo' as const,
+        uploadedBy: user?.id || 'unknown',
+        uploadedAt: new Date().toISOString(),
+        uploadSource: 'web' as const,
+        takenAt: takenAt || new Date().toISOString(),
+        dateInfo: {
+          source: uploadFile.exifData?.dateTimeOriginal ? 'exif' as const : 'upload-time' as const,
+          confidence: uploadFile.exifData?.dateTimeOriginal ? 'high' as const : 'low' as const,
+        },
+        metadata: {
+          size: uploadFile.file.size,
+          hash: uploadFile.hash || 'unknown',
+          // Add EXIF data if available
+          ...(uploadFile.exifData && { exif: uploadFile.exifData }),
+          // Add GPS location if available in EXIF
+          ...(uploadFile.exifData?.gps && {
+            location: {
+              lat: uploadFile.exifData.gps.latitude,
+              lng: uploadFile.exifData.gps.longitude,
+            },
+          }),
+          // Add camera info if available
+          ...(uploadFile.exifData?.make && uploadFile.exifData?.model && {
+            camera: `${uploadFile.exifData.make} ${uploadFile.exifData.model}`,
+          }),
+          // Add dimensions if available
+          ...(uploadFile.exifData?.pixelXDimension && { width: uploadFile.exifData.pixelXDimension }),
+          ...(uploadFile.exifData?.pixelYDimension && { height: uploadFile.exifData.pixelYDimension }),
+        },
+        subjects: [], // Will be populated by admin during upload
+        tags: [], // Will be populated by admin during upload
+        // File processing flags
+        isScreenshot: uploadFile.file.name.toLowerCase().includes('screenshot'),
+        isEdited: uploadFile.file.name.toLowerCase().includes('edited'),
+        hasValidExif: !!uploadFile.exifData,
+      }
+
+      updateFileStatus(uploadFile.id, 'processing', 85)
+
+      // Save metadata to database
+      console.log(`Saving metadata to database for ${uploadFile.file.name}`)
+      const saveResponse = await fetch('/api/media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mediaMetadata)
+      })
+
+      if (!saveResponse.ok) {
+        const errorData = await saveResponse.json().catch(() => ({ error: 'Failed to parse error response' }))
+        throw new Error(errorData.error || `Failed to save metadata (${saveResponse.status})`)
+      }
+
+      const saveResult = await saveResponse.json()
+      console.log(`Metadata saved successfully:`, saveResult)
 
       // Mark as completed
       updateFileStatus(uploadFile.id, 'completed', 100)
@@ -306,6 +493,59 @@ export default function AdminUploadPage() {
     toast.success('File marked for upload (duplicate warning removed)')
   }
 
+  const handleTestExifExtraction = async () => {
+    console.log('[CLIENT TEST] Testing EXIF extraction capabilities...')
+    
+    try {
+      // Test if exifr is available
+      const exifr = await import('exifr')
+      console.log('[CLIENT TEST] exifr library loaded:', !!exifr.default)
+      
+      // Test if we're in browser environment
+      console.log('[CLIENT TEST] Browser environment:', typeof window !== 'undefined')
+      console.log('[CLIENT TEST] Document available:', typeof document !== 'undefined')
+      
+      toast.success('EXIF library test completed - check console for details')
+    } catch (error) {
+      console.error('[CLIENT TEST] EXIF test failed:', error)
+      toast.error('EXIF library test failed - check console for details')
+    }
+  }
+
+  const handleTestFileExif = async () => {
+    // Create a file input for testing
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+
+      try {
+        toast.info(`Testing EXIF extraction on ${file.name}...`)
+        console.log(`Testing EXIF extraction on file:`, {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          lastModified: new Date(file.lastModified)
+        })
+
+        const exifData = await extractExifMetadata(file)
+        console.log('EXIF extraction result:', exifData)
+
+        if (exifData) {
+          toast.success(`EXIF data found! Camera: ${exifData.make || 'Unknown'} ${exifData.model || ''}, Date: ${exifData.dateTimeOriginal ? new Date(exifData.dateTimeOriginal).toLocaleDateString() : 'No date'}`)
+        } else {
+          toast.warning(`No EXIF data found in ${file.name}. This might be normal for some image types or processed photos.`)
+        }
+      } catch (error) {
+        console.error('EXIF extraction failed:', error)
+        toast.error(`EXIF extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      }
+    }
+    input.click()
+  }
+
   // Calculate statistics
   const stats = {
     total: uploadFiles.length,
@@ -322,10 +562,30 @@ export default function AdminUploadPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Upload Media</h1>
-        <p className="text-muted-foreground">
-          Upload photos and videos to the family gallery. Duplicate detection is enabled to help prevent duplicate uploads.
-        </p>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Upload Media</h1>
+            <p className="text-muted-foreground">
+              Upload photos and videos to the family gallery. Duplicate detection is enabled to help prevent duplicate uploads.
+            </p>
+          </div>
+          <div className="flex space-x-2">
+            <Button
+              onClick={handleTestExifExtraction}
+              variant="outline"
+              size="sm"
+            >
+              Test EXIF Library
+            </Button>
+            <Button
+              onClick={handleTestFileExif}
+              variant="outline"
+              size="sm"
+            >
+              Test File EXIF
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Upload Statistics */}

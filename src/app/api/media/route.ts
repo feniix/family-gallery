@@ -2,16 +2,33 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getMediaDb, usersDb } from '@/lib/json-db';
 import { withRetry } from '@/lib/json-db';
+import { getIsAdmin } from '@/lib/server-auth';
 import type { MediaMetadata, UsersData } from '@/types/media';
 
 /**
- * Check if user is admin
+ * Check if user is admin by userId and optional email
  */
-async function isAdmin(userId: string): Promise<boolean> {
+async function isAdmin(userId: string, userEmail?: string): Promise<boolean> {
   try {
+    // First try the server-auth method which uses currentUser() 
+    const isAdminFromAuth = await getIsAdmin();
+    if (isAdminFromAuth) {
+      return true;
+    }
+    
+    // Check against environment variable admin emails (same as client-side)
+    if (userEmail) {
+      const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
+      if (adminEmails.includes(userEmail)) {
+        return true;
+      }
+    }
+    
+    // Fallback to database check
     const users: UsersData = await usersDb.read();
-    const user = users.users[userId];
-    return user?.role === 'admin';
+    const dbUser = users.users[userId];
+    return dbUser?.role === 'admin';
+    
   } catch (error) {
     console.error('Error checking admin status:', error);
     return false;
@@ -104,18 +121,30 @@ export async function POST(request: NextRequest) {
     // Determine year from takenAt date
     const takenAtDate = new Date(mediaData.takenAt);
     const year = takenAtDate.getFullYear();
+    
+    console.log(`[MEDIA API] Saving media to year ${year}:`, {
+      id: mediaData.id,
+      filename: mediaData.originalFilename,
+      takenAt: mediaData.takenAt,
+      parsedDate: takenAtDate.toISOString(),
+      hash: mediaData.metadata?.hash?.substring(0, 16) + '...'
+    })
 
     // Add to media database for the year
     const mediaDb = getMediaDb(year);
     const updatedData = await withRetry(() =>
       mediaDb.update((current) => {
+        console.log(`[MEDIA API] Current ${year} database has ${current.media.length} files before adding`)
+        
         // Check for duplicates
         const existingIndex = current.media.findIndex(m => m.id === mediaData.id);
         
         if (existingIndex >= 0) {
+          console.log(`[MEDIA API] Updating existing file at index ${existingIndex}`)
           // Update existing
           current.media[existingIndex] = mediaData;
         } else {
+          console.log(`[MEDIA API] Adding new file to ${year} database`)
           // Add new
           current.media.push(mediaData);
         }
@@ -123,9 +152,12 @@ export async function POST(request: NextRequest) {
         // Sort by takenAt date (newest first)
         current.media.sort((a, b) => new Date(b.takenAt).getTime() - new Date(a.takenAt).getTime());
 
+        console.log(`[MEDIA API] ${year} database now has ${current.media.length} files after adding`)
         return current;
       })
     );
+    
+    console.log(`[MEDIA API] Successfully saved to ${year} database. Total files: ${updatedData.media.length}`)
 
     return NextResponse.json({
       success: true,
