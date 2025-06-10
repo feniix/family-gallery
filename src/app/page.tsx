@@ -1,26 +1,17 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { SignInButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
+import Link from 'next/link'
+import { useIsAdmin } from '@/lib/auth'
 
 export default function Home() {
   return (
     <div className="min-h-screen p-8 bg-background">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-4xl font-bold">Family Gallery</h1>
-            <SignedIn>
-              <UserButton />
-            </SignedIn>
-            <SignedOut>
-              <SignInButton>
-                <Button>Sign In</Button>
-              </SignInButton>
-            </SignedOut>
-          </div>
+          <h1 className="text-4xl font-bold mb-4">Welcome to Family Gallery</h1>
           <p className="text-muted-foreground text-lg">
-            A private family photo and video gallery
+            A private family photo and video gallery with secure upload and sharing
           </p>
         </div>
 
@@ -29,85 +20,98 @@ export default function Home() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 Setup Status
-                <Badge variant="secondary">Stage 1.3</Badge>
+                <Badge variant="default">Stage 2.1</Badge>
               </CardTitle>
               <CardDescription>
-                R2 Storage & JSON Database implemented
+                Admin Upload Interface implemented
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex items-center gap-2">
                 <Badge variant="default">✓</Badge>
-                <span className="text-sm">R2 client configuration</span>
+                <span className="text-sm">Drag-and-drop upload interface</span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="default">✓</Badge>
-                <span className="text-sm">JSON file management with locking</span>
+                <span className="text-sm">Multi-file upload support</span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="default">✓</Badge>
-                <span className="text-sm">Presigned URL generation</span>
+                <span className="text-sm">Upload progress tracking</span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="default">✓</Badge>
-                <span className="text-sm">Upload queue system</span>
+                <span className="text-sm">Admin-only access protection</span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="default">✓</Badge>
-                <span className="text-sm">API routes for media operations</span>
+                <span className="text-sm">File validation and error handling</span>
               </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Next Steps</CardTitle>
+              <CardTitle>Features</CardTitle>
               <CardDescription>
-                Upcoming implementation stages
+                Available functionality
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex items-center gap-2">
                 <Badge variant="default">✓</Badge>
-                <span className="text-sm">Authentication (Clerk)</span>
+                <span className="text-sm">Authentication (Google/Facebook)</span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="default">✓</Badge>
-                <span className="text-sm">R2 Storage & JSON DB</span>
+                <span className="text-sm">Admin role management</span>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline">Stage 2.1</Badge>
-                <span className="text-sm">Admin Upload Interface</span>
+                <Badge variant="default">✓</Badge>
+                <span className="text-sm">R2 cloud storage</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="default">✓</Badge>
+                <span className="text-sm">Upload interface</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">Next</Badge>
+                <span className="text-sm">EXIF processing</span>
               </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Environment</CardTitle>
+              <CardTitle>Quick Actions</CardTitle>
               <CardDescription>
-                Development configuration
+                Get started with the gallery
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">Dev</Badge>
-                <span className="text-sm">Environment variables ready</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">Config</Badge>
-                <span className="text-sm">Configuration utilities</span>
-              </div>
-              <Button className="w-full mt-4" variant="outline">
-                Ready for Stage 2.1
-              </Button>
+            <CardContent className="space-y-3">
+              <Link href="/gallery">
+                <Button className="w-full" variant="outline">
+                  View Gallery
+                </Button>
+              </Link>
+              <Link href="/admin/upload">
+                <Button className="w-full">
+                  Upload Photos & Videos
+                </Button>
+              </Link>
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                Upload requires admin privileges
+              </p>
             </CardContent>
           </Card>
         </div>
 
         <div className="mt-8 text-center">
           <p className="text-sm text-muted-foreground">
-            Stage 1.3 completed successfully! 🎉
+            Stage 2.1 (Admin Upload Interface) completed successfully! 🎉
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Next: Stage 2.2 - EXIF Processing & Metadata
           </p>
         </div>
       </div>
