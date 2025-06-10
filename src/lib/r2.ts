@@ -2,29 +2,43 @@ import { S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
-// R2 Configuration
+// R2 Configuration - only available on server-side
 export const r2Config = {
-  accountId: process.env.R2_ACCOUNT_ID!,
-  accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-  secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  bucketName: process.env.R2_BUCKET_NAME!,
-  publicUrl: process.env.R2_PUBLIC_URL!,
+  accountId: typeof window === 'undefined' ? process.env.R2_ACCOUNT_ID! : '',
+  accessKeyId: typeof window === 'undefined' ? process.env.R2_ACCESS_KEY_ID! : '',
+  secretAccessKey: typeof window === 'undefined' ? process.env.R2_SECRET_ACCESS_KEY! : '',
+  bucketName: typeof window === 'undefined' ? process.env.R2_BUCKET_NAME! : '',
+  publicUrl: typeof window === 'undefined' ? process.env.R2_PUBLIC_URL! : '',
 };
 
-// Validate R2 configuration
-if (!r2Config.accountId || !r2Config.accessKeyId || !r2Config.secretAccessKey || !r2Config.bucketName) {
-  throw new Error('Missing required R2 environment variables');
+// Validate R2 configuration (only on server-side)
+if (typeof window === 'undefined') {
+  if (!r2Config.accountId || !r2Config.accessKeyId || !r2Config.secretAccessKey || !r2Config.bucketName) {
+    throw new Error('Missing required R2 environment variables');
+  }
 }
 
-// Create R2 client (S3-compatible)
-export const r2Client = new S3Client({
+// Create R2 client (S3-compatible) - only on server-side
+export const r2Client = typeof window === 'undefined' ? new S3Client({
   region: 'auto',
   endpoint: `https://${r2Config.accountId}.r2.cloudflarestorage.com`,
   credentials: {
     accessKeyId: r2Config.accessKeyId,
     secretAccessKey: r2Config.secretAccessKey,
   },
-});
+}) : null;
+
+/**
+ * Ensure we're on server-side before making R2 calls
+ */
+function ensureServerSide(): void {
+  if (typeof window !== 'undefined') {
+    throw new Error('R2 operations can only be performed on the server-side');
+  }
+  if (!r2Client) {
+    throw new Error('R2 client not initialized');
+  }
+}
 
 /**
  * Generate a presigned URL for uploading files to R2
@@ -37,13 +51,15 @@ export async function generatePresignedUploadUrl(
   contentType?: string,
   expiresIn: number = 900 // 15 minutes
 ): Promise<string> {
+  ensureServerSide();
+  
   const command = new PutObjectCommand({
     Bucket: r2Config.bucketName,
     Key: key,
     ContentType: contentType,
   });
 
-  return await getSignedUrl(r2Client, command, { expiresIn });
+  return await getSignedUrl(r2Client!, command, { expiresIn });
 }
 
 /**
@@ -56,12 +72,14 @@ export async function generatePresignedDownloadUrl(
   key: string,
   expiresIn: number = 3600 // 1 hour
 ): Promise<string> {
+  ensureServerSide();
+  
   const command = new GetObjectCommand({
     Bucket: r2Config.bucketName,
     Key: key,
   });
 
-  return await getSignedUrl(r2Client, command, { expiresIn });
+  return await getSignedUrl(r2Client!, command, { expiresIn });
 }
 
 /**
@@ -69,12 +87,14 @@ export async function generatePresignedDownloadUrl(
  * @param key - The object key (file path) to delete
  */
 export async function deleteFromR2(key: string): Promise<void> {
+  ensureServerSide();
+  
   const command = new DeleteObjectCommand({
     Bucket: r2Config.bucketName,
     Key: key,
   });
 
-  await r2Client.send(command);
+  await r2Client!.send(command);
 }
 
 /**
@@ -83,7 +103,11 @@ export async function deleteFromR2(key: string): Promise<void> {
  * @returns Public URL (if bucket is public) or custom domain URL
  */
 export function getPublicUrl(key: string): string {
-  return `${r2Config.publicUrl}/${key}`;
+  const publicUrl = typeof window === 'undefined' ? r2Config.publicUrl : process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
+  if (!publicUrl) {
+    throw new Error('R2 public URL not configured');
+  }
+  return `${publicUrl}/${key}`;
 }
 
 /**

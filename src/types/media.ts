@@ -1,9 +1,81 @@
 /**
+ * EXIF metadata extracted from images
+ */
+export interface ExifMetadata {
+  // Date and time information
+  dateTimeOriginal?: Date;
+  dateTime?: Date;
+  dateTimeDigitized?: Date;
+  
+  // Camera information
+  make?: string;
+  model?: string;
+  lens?: string;
+  software?: string;
+  
+  // Technical settings
+  fNumber?: number;
+  exposureTime?: string;
+  iso?: number;
+  focalLength?: number;
+  whiteBalance?: string;
+  flash?: string;
+  
+  // Location information
+  gps?: {
+    latitude: number;
+    longitude: number;
+    altitude?: number;
+  };
+  
+  // Image properties
+  orientation?: number;
+  colorSpace?: string;
+  pixelXDimension?: number;
+  pixelYDimension?: number;
+  
+  // Additional metadata
+  artist?: string;
+  copyright?: string;
+  imageDescription?: string;
+  userComment?: string;
+}
+
+/**
+ * Date processing result with fallback strategies
+ */
+export interface DateProcessingResult {
+  takenAt: Date;
+  dateSource: 'exif' | 'filename' | 'file-creation' | 'upload-time';
+  timezone?: string;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+/**
+ * Duplicate detection result
+ */
+export interface DuplicateCheckResult {
+  isDuplicate: boolean;
+  existingMedia?: MediaMetadata;
+  hash: string;
+}
+
+/**
+ * File naming result
+ */
+export interface FileNamingResult {
+  filename: string;
+  path: string;
+  thumbnailPath?: string;
+}
+
+/**
  * Media metadata interface
  */
 export interface MediaMetadata {
   id: string;
   filename: string;
+  originalFilename: string; // Store original name separately
   path: string;
   type: 'photo' | 'video';
   uploadedBy: string;
@@ -14,6 +86,11 @@ export interface MediaMetadata {
     caption?: string;
   };
   takenAt: string;
+  dateInfo: {
+    source: 'exif' | 'filename' | 'file-creation' | 'upload-time';
+    timezone?: string;
+    confidence: 'high' | 'medium' | 'low';
+  };
   metadata: {
     width?: number;
     height?: number;
@@ -21,10 +98,17 @@ export interface MediaMetadata {
     size: number;
     camera?: string;
     location?: { lat: number; lng: number };
+    // Enhanced metadata from EXIF
+    exif?: ExifMetadata;
+    hash: string; // For duplicate detection
   };
   subjects: string[];
   tags: string[];
   thumbnailPath?: string;
+  // File processing flags
+  isScreenshot?: boolean;
+  isEdited?: boolean;
+  hasValidExif?: boolean;
 }
 
 /**

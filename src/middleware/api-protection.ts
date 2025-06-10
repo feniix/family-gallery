@@ -1,11 +1,11 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserRole } from '@/lib/server-auth'
 
 /**
  * Middleware to protect API routes requiring authentication
  */
-export async function requireAuthAPI(req: NextRequest) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function requireAuthAPI(_req: NextRequest) {
   const { userId } = await auth()
   
   if (!userId) {
@@ -66,4 +66,6 @@ export function withAdmin(handler: (req: NextRequest, context: { userId: string 
     
     return handler(req, authResult)
   }
-} 
+}
+
+ 

@@ -12,15 +12,18 @@ import {
   FileImage, 
   FileVideo, 
   Clock,
-  Upload
+  Upload,
+  AlertTriangle,
+  CheckCircle2
 } from 'lucide-react'
 
 interface UploadProgressProps {
   files: UploadFile[]
   onRemoveFile: (fileId: string) => void
+  onForceUploadDuplicate?: (fileId: string) => void
 }
 
-export function UploadProgress({ files, onRemoveFile }: UploadProgressProps) {
+export function UploadProgress({ files, onRemoveFile, onForceUploadDuplicate }: UploadProgressProps) {
   // Format file size
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes'
@@ -43,6 +46,10 @@ export function UploadProgress({ files, onRemoveFile }: UploadProgressProps) {
         return <Badge variant="default"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>
       case 'error':
         return <Badge variant="destructive"><AlertCircle className="h-3 w-3 mr-1" />Failed</Badge>
+      case 'duplicate-warning':
+        return <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50 dark:bg-orange-950 dark:text-orange-300">
+          <AlertTriangle className="h-3 w-3 mr-1" />Duplicate
+        </Badge>
       default:
         return <Badge variant="secondary">Unknown</Badge>
     }
@@ -70,7 +77,14 @@ export function UploadProgress({ files, onRemoveFile }: UploadProgressProps) {
   return (
     <div className="space-y-3">
       {files.map((uploadFile) => (
-        <Card key={uploadFile.id} className="p-4">
+        <Card 
+          key={uploadFile.id} 
+          className={`p-4 ${
+            uploadFile.status === 'duplicate-warning' 
+              ? 'border-orange-200 bg-orange-50 dark:bg-orange-950 dark:border-orange-800' 
+              : ''
+          }`}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3 flex-1 min-w-0">
               {/* File Icon */}
@@ -96,6 +110,35 @@ export function UploadProgress({ files, onRemoveFile }: UploadProgressProps) {
                     </span>
                   )}
                 </div>
+
+                {/* Duplicate Warning Info */}
+                {uploadFile.status === 'duplicate-warning' && uploadFile.duplicateInfo && (
+                  <div className="mt-2 p-2 bg-orange-100 dark:bg-orange-900 border border-orange-200 dark:border-orange-700 rounded text-xs">
+                    <div className="flex items-center space-x-1 mb-1">
+                      <AlertTriangle className="h-3 w-3 text-orange-600" />
+                      <span className="font-medium text-orange-800 dark:text-orange-200">Duplicate detected:</span>
+                    </div>
+                    <p className="text-orange-700 dark:text-orange-300">
+                                              Same as &ldquo;{uploadFile.duplicateInfo.existingFilename}&rdquo; 
+                      {uploadFile.duplicateInfo.existingDate && (
+                        <>
+                          {' '}from {new Date(uploadFile.duplicateInfo.existingDate).toLocaleDateString()}
+                        </>
+                      )}
+                    </p>
+                    {onForceUploadDuplicate && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-2 h-6 text-xs border-orange-300 hover:bg-orange-200"
+                        onClick={() => onForceUploadDuplicate(uploadFile.id)}
+                      >
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Upload Anyway
+                      </Button>
+                    )}
+                  </div>
+                )}
 
                 {/* Progress Bar */}
                 {uploadFile.status === 'uploading' || uploadFile.status === 'processing' ? (
@@ -128,6 +171,13 @@ export function UploadProgress({ files, onRemoveFile }: UploadProgressProps) {
                 {uploadFile.jobId && (
                   <div className="mt-1 text-xs text-muted-foreground">
                     Job ID: {uploadFile.jobId}
+                  </div>
+                )}
+
+                {/* File Hash for debugging */}
+                {uploadFile.hash && process.env.NODE_ENV === 'development' && (
+                  <div className="mt-1 text-xs text-muted-foreground font-mono">
+                    Hash: {uploadFile.hash.substring(0, 16)}...
                   </div>
                 )}
               </div>

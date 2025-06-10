@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
+import { NextRequest, NextResponse } from 'next/server'
 import { Webhook } from 'svix'
-import { createUser, type User } from '@/lib/users'
 
 interface ClerkWebhookEvent {
   type: string
@@ -74,18 +73,11 @@ export async function POST(req: NextRequest) {
         return new Response('No email found', { status: 400 })
       }
 
-      const user = createUser({
-        id: evt.data.id,
-        email,
-        name: `${firstName} ${lastName}`.trim() || email,
-        provider,
-      })
-
       // TODO: In Stage 1.3, we'll implement JSON database operations
       // For now, just log the user creation
-      console.log('User created:', user)
+      console.log('User created:', { id: evt.data.id, email, firstName, lastName, provider })
 
-      return NextResponse.json({ success: true, user })
+      return NextResponse.json({ success: true, user: { id: evt.data.id, email, firstName, lastName, provider } })
     } catch (error) {
       console.error('Error processing user.created webhook:', error)
       return new Response('Error processing webhook', { status: 500 })

@@ -3,8 +3,22 @@ import { r2Client, r2Config, generateFilePath } from './r2';
 import { withLock } from './json-locking';
 
 /**
+ * Ensure we're on server-side and r2Client is available
+ */
+function ensureR2Client() {
+  if (typeof window !== 'undefined') {
+    throw new Error('JSON database operations can only be performed on the server-side');
+  }
+  if (!r2Client) {
+    throw new Error('R2 client not initialized');
+  }
+  return r2Client;
+}
+
+/**
  * Interface for JSON database operations
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface JsonDbOperation<T = any> {
   read(): Promise<T>;
   write(data: T): Promise<void>;
@@ -16,15 +30,17 @@ export interface JsonDbOperation<T = any> {
  * @param filename - The JSON filename (e.g., 'users.json', 'media/2024.json')
  * @returns Parsed JSON object or null if file doesn't exist
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function readJsonFile<T = any>(filename: string): Promise<T | null> {
   try {
+    const client = ensureR2Client();
     const key = generateFilePath.jsonData(filename);
     const command = new GetObjectCommand({
       Bucket: r2Config.bucketName,
       Key: key,
     });
 
-    const response = await r2Client.send(command);
+    const response = await client.send(command);
     
     if (!response.Body) {
       return null;
@@ -32,6 +48,7 @@ export async function readJsonFile<T = any>(filename: string): Promise<T | null>
 
     const bodyString = await response.Body.transformToString();
     return JSON.parse(bodyString) as T;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     // If file doesn't exist, return null
     if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
@@ -46,7 +63,9 @@ export async function readJsonFile<T = any>(filename: string): Promise<T | null>
  * @param filename - The JSON filename
  * @param data - Data to write
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function writeJsonFile<T = any>(filename: string, data: T): Promise<void> {
+  const client = ensureR2Client();
   const key = generateFilePath.jsonData(filename);
   const jsonString = JSON.stringify(data, null, 2);
 
@@ -57,7 +76,7 @@ export async function writeJsonFile<T = any>(filename: string, data: T): Promise
     ContentType: 'application/json',
   });
 
-  await r2Client.send(command);
+  await client.send(command);
 }
 
 /**
@@ -67,6 +86,7 @@ export async function writeJsonFile<T = any>(filename: string, data: T): Promise
  * @param defaultValue - Default value if file doesn't exist
  * @returns Updated data
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function updateJsonFile<T = any>(
   filename: string,
   updater: (current: T) => T,
@@ -94,6 +114,7 @@ export async function updateJsonFile<T = any>(
  * @param defaultValue - Default value if file doesn't exist
  * @returns Object with read, write, and update methods
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createJsonDb<T = any>(filename: string, defaultValue: T): JsonDbOperation<T> {
   return {
     async read(): Promise<T> {
@@ -169,4 +190,6 @@ export const DATA_STRUCTURE = {
   users: 'users.json',
   config: 'config.json',
   media: (year: number) => `media/${year}.json`,
-} as const; 
+} as const;
+
+ 

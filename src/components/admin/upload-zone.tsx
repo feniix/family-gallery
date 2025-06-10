@@ -1,10 +1,10 @@
 'use client'
 
-import { useCallback, useState } from 'react'
-import { useDropzone } from 'react-dropzone'
+import { useCallback } from 'react'
+import { useDropzone, FileRejection, FileError } from 'react-dropzone'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Upload, FileImage, FileVideo, X, AlertCircle } from 'lucide-react'
+import { Upload, FileImage, FileVideo, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface UploadZoneProps {
@@ -14,41 +14,42 @@ interface UploadZoneProps {
   maxSize?: number // in bytes
 }
 
+
+
 export function UploadZone({ 
   onFilesSelected, 
   disabled = false, 
   maxFiles = 50,
   maxSize = 50 * 1024 * 1024 // 50MB default
 }: UploadZoneProps) {
-  const [dragActive, setDragActive] = useState(false)
 
   // Validate file type
-  const isValidFileType = (file: File): boolean => {
+  const isValidFileType = useCallback((file: File): boolean => {
     const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
     const validVideoTypes = ['video/mp4', 'video/quicktime', 'video/avi', 'video/mov']
     
     return validImageTypes.includes(file.type) || validVideoTypes.includes(file.type)
-  }
+  }, [])
 
   // Validate file size
-  const isValidFileSize = (file: File): boolean => {
+  const isValidFileSize = useCallback((file: File): boolean => {
     return file.size <= maxSize
-  }
+  }, [maxSize])
 
   // Format file size for display
-  const formatFileSize = (bytes: number): string => {
+  const formatFileSize = useCallback((bytes: number): string => {
     if (bytes === 0) return '0 Bytes'
     const k = 1024
     const sizes = ['Bytes', 'KB', 'MB', 'GB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
+  }, [])
 
-  const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
+  const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
     // Handle rejected files
     if (rejectedFiles.length > 0) {
       rejectedFiles.forEach(({ file, errors }) => {
-        errors.forEach((error: any) => {
+        errors.forEach((error: FileError) => {
           if (error.code === 'file-too-large') {
             toast.error(`File "${file.name}" is too large. Maximum size is ${formatFileSize(maxSize)}.`)
           } else if (error.code === 'file-invalid-type') {
@@ -78,12 +79,10 @@ export function UploadZone({
     if (validFiles.length > 0) {
       onFilesSelected(validFiles)
     }
-  }, [onFilesSelected, maxFiles, maxSize])
+  }, [onFilesSelected, maxFiles, maxSize, isValidFileType, isValidFileSize, formatFileSize])
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
-    onDragEnter: () => setDragActive(true),
-    onDragLeave: () => setDragActive(false),
     disabled,
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp'],
@@ -102,7 +101,7 @@ export function UploadZone({
         {...getRootProps()}
         className={`
           border-2 border-dashed transition-all duration-200 cursor-pointer
-          ${isDragActive || dragActive 
+          ${isDragActive 
             ? 'border-primary bg-primary/5' 
             : 'border-muted-foreground/25 hover:border-muted-foreground/50'
           }
@@ -113,7 +112,7 @@ export function UploadZone({
         
         <div className="p-12 text-center">
           <div className="mx-auto mb-4">
-            {isDragActive || dragActive ? (
+            {isDragActive ? (
               <Upload className="h-12 w-12 text-primary mx-auto animate-bounce" />
             ) : (
               <div className="flex items-center justify-center space-x-2">
@@ -124,7 +123,7 @@ export function UploadZone({
           </div>
 
           <h3 className="text-lg font-semibold mb-2">
-            {isDragActive || dragActive 
+            {isDragActive 
               ? 'Drop files here!' 
               : 'Drag and drop your photos and videos'
             }

@@ -2,7 +2,6 @@ import { requireAuth } from '@/lib/server-auth'
 import { currentUser } from '@clerk/nextjs/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { UserButton } from '@clerk/nextjs'
 
 export default async function GalleryPage() {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { generatePresignedUploadUrl, isValidFileType, generateFilePath } from '@/lib/r2';
-import { createJobId } from '@/lib/upload-queue';
+
 
 /**
  * POST /api/upload/presigned
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Create upload job ID for tracking
-    const jobId = createJobId();
+    const jobId = crypto.randomUUID();
 
     return NextResponse.json({
       success: true,
