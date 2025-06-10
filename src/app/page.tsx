@@ -1,13 +1,24 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { SignInButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 
 export default function Home() {
   return (
     <div className="min-h-screen p-8 bg-background">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-4">Family Gallery</h1>
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-4xl font-bold">Family Gallery</h1>
+            <SignedIn>
+              <UserButton />
+            </SignedIn>
+            <SignedOut>
+              <SignInButton>
+                <Button>Sign In</Button>
+              </SignInButton>
+            </SignedOut>
+          </div>
           <p className="text-muted-foreground text-lg">
             A private family photo and video gallery
           </p>
@@ -18,32 +29,32 @@ export default function Home() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 Setup Status
-                <Badge variant="secondary">Stage 1.1</Badge>
+                <Badge variant="secondary">Stage 1.2</Badge>
               </CardTitle>
               <CardDescription>
-                Project foundation and environment setup
+                Authentication integration completed
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex items-center gap-2">
                 <Badge variant="default">✓</Badge>
-                <span className="text-sm">Next.js 15.3.3 initialized</span>
+                <span className="text-sm">Clerk authentication setup</span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="default">✓</Badge>
-                <span className="text-sm">TypeScript configured</span>
+                <span className="text-sm">Protected routes configured</span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="default">✓</Badge>
-                <span className="text-sm">Tailwind CSS + Shadcn/ui</span>
+                <span className="text-sm">User role system implemented</span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="default">✓</Badge>
-                <span className="text-sm">Yarn 4 package manager</span>
+                <span className="text-sm">Sign-in/sign-up pages created</span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="default">✓</Badge>
-                <span className="text-sm">Development server running</span>
+                <span className="text-sm">Webhook handler configured</span>
               </div>
             </CardContent>
           </Card>
@@ -57,7 +68,7 @@ export default function Home() {
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex items-center gap-2">
-                <Badge variant="outline">Stage 1.2</Badge>
+                <Badge variant="default">✓</Badge>
                 <span className="text-sm">Authentication (Clerk)</span>
               </div>
               <div className="flex items-center gap-2">
@@ -88,7 +99,7 @@ export default function Home() {
                 <span className="text-sm">Configuration utilities</span>
               </div>
               <Button className="w-full mt-4" variant="outline">
-                Ready for Stage 1.2
+                Ready for Stage 1.3
               </Button>
             </CardContent>
           </Card>
@@ -96,7 +107,7 @@ export default function Home() {
 
         <div className="mt-8 text-center">
           <p className="text-sm text-muted-foreground">
-            Stage 1.1 completed successfully! 🎉
+            Stage 1.2 completed successfully! 🎉
           </p>
         </div>
       </div>
