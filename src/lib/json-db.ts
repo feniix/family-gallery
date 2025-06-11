@@ -1,6 +1,7 @@
 import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { r2Client, r2Config, generateFilePath } from './r2';
 import { withLock } from './json-locking';
+import { dbLogger, indexLogger } from './logger';
 
 /**
  * Ensure we're on server-side and r2Client is available
@@ -33,48 +34,47 @@ export interface JsonDbOperation<T = any> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function readJsonFile<T = any>(filename: string): Promise<T | null> {
   try {
-    console.log(`[READ JSON] Attempting to read: ${filename}`)
+    dbLogger.debug(`Attempting to read file: ${filename}`);
     const client = ensureR2Client();
     const key = generateFilePath.jsonData(filename);
-    console.log(`[READ JSON] Generated R2 key: ${key}`)
+    dbLogger.debug(`Generated R2 key: ${key}`);
     
     const command = new GetObjectCommand({
       Bucket: r2Config.bucketName,
       Key: key,
     });
 
-    console.log(`[READ JSON] Sending GetObject command for: ${key}`)
     const response = await client.send(command);
-    console.log(`[READ JSON] GetObject response status: ${response.$metadata.httpStatusCode}`)
+    dbLogger.debug(`GetObject response`, { filename, status: response.$metadata.httpStatusCode });
     
     if (!response.Body) {
-      console.log(`[READ JSON] No body in response for: ${filename}`)
+      dbLogger.warn(`No body in response for file: ${filename}`);
       return null;
     }
 
     const bodyString = await response.Body.transformToString();
-    console.log(`[READ JSON] Successfully read ${filename}, content length: ${bodyString.length}`)
+    dbLogger.debug(`Successfully read file`, { filename, contentLength: bodyString.length });
     
     const parsed = JSON.parse(bodyString) as T;
     if (parsed && typeof parsed === 'object' && 'media' in parsed) {
       const media = (parsed as Record<string, unknown>).media;
       const mediaCount = Array.isArray(media) ? media.length : 0;
-      console.log(`[READ JSON] Parsed ${filename} with ${mediaCount} media items`)
+      dbLogger.info(`Loaded media file`, { filename, mediaCount });
     }
     
     return parsed;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
-    console.log(`[READ JSON] Error reading ${filename}:`, {
+    dbLogger.error(`Error reading file: ${filename}`, {
       name: error.name,
       code: error.code,
       httpStatusCode: error.$metadata?.httpStatusCode,
       message: error.message
-    })
+    });
     
     // If file doesn't exist, return null
     if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-      console.log(`[READ JSON] File ${filename} does not exist (NoSuchKey/404)`)
+      dbLogger.debug(`File does not exist: ${filename}`);
       return null;
     }
     throw error;
@@ -275,7 +275,7 @@ export async function updateIndexMediaCount(): Promise<void> {
  * This scans all possible years and builds the index
  */
 export async function buildMediaIndexFromExistingData(): Promise<{ yearsFound: number[], totalMedia: number }> {
-  console.log('[INDEX MIGRATION] Starting media index migration...');
+  indexLogger.info('Starting media index migration');
   
   const yearsWithData: number[] = [];
   let totalMedia = 0;
@@ -285,7 +285,7 @@ export async function buildMediaIndexFromExistingData(): Promise<{ yearsFound: n
   const startYear = 1970; // Before digital cameras, but covers scanned photos
   const endYear = currentYear + 10; // Handle future dates or timezone issues
   
-  console.log(`[INDEX MIGRATION] Scanning years ${startYear} to ${endYear}...`);
+  indexLogger.info(`Scanning years ${startYear} to ${endYear}`);
   
   // Check all years in parallel to find which ones have data
   const yearPromises = [];
@@ -296,11 +296,12 @@ export async function buildMediaIndexFromExistingData(): Promise<{ yearsFound: n
           const mediaDb = getMediaDb(checkYear);
           const mediaData = await withRetry(() => mediaDb.read());
           if (mediaData.media && mediaData.media.length > 0) {
-            console.log(`[INDEX MIGRATION] Found ${mediaData.media.length} media items in year ${checkYear}`);
+            indexLogger.debug(`Found media in year ${checkYear}`, { count: mediaData.media.length });
             return { year: checkYear, count: mediaData.media.length };
           }
         } catch {
           // Year has no data or doesn't exist
+          indexLogger.trace(`No data for year ${checkYear}`);
         }
         return null;
       })(year)
@@ -320,8 +321,11 @@ export async function buildMediaIndexFromExistingData(): Promise<{ yearsFound: n
   // Sort years descending (newest first)
   yearsWithData.sort((a, b) => b - a);
   
-  console.log(`[INDEX MIGRATION] Found data in ${yearsWithData.length} years:`, yearsWithData);
-  console.log(`[INDEX MIGRATION] Total media items: ${totalMedia}`);
+  indexLogger.info('Migration scan complete', { 
+    yearsFound: yearsWithData.length, 
+    years: yearsWithData, 
+    totalMedia 
+  });
   
   // Update the index
   await withRetry(() =>
@@ -333,7 +337,7 @@ export async function buildMediaIndexFromExistingData(): Promise<{ yearsFound: n
     })
   );
   
-  console.log('[INDEX MIGRATION] Media index migration completed');
+  indexLogger.info('Media index migration completed');
   
   return { yearsFound: yearsWithData, totalMedia };
 }

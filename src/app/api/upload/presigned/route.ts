@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { generatePresignedUploadUrl, isValidFileType, generateFilePath } from '@/lib/r2';
 import { uploadConfig, isFileSizeValid, getFileSizeLimitDisplay } from '@/lib/config';
+import { r2Logger } from '@/lib/logger';
 
 
 /**
@@ -17,7 +18,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse request body
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
     const { filename, contentType, fileSize, takenAt } = body;
 
     // Validate required fields
@@ -46,7 +55,12 @@ export async function POST(request: NextRequest) {
 
     // Generate file path using EXIF date if available, otherwise current date
     const uploadDate = takenAt ? new Date(takenAt) : new Date();
-    console.log(`Generating presigned URL for ${filename} with date: ${uploadDate.toISOString()} (${uploadDate.getFullYear()}/${String(uploadDate.getMonth() + 1).padStart(2, '0')})`);
+    r2Logger.debug(`Generating presigned URL`, { 
+      filename, 
+      uploadDate: uploadDate.toISOString(), 
+      year: uploadDate.getFullYear(),
+      month: String(uploadDate.getMonth() + 1).padStart(2, '0')
+    });
     const filePath = generateFilePath.original(uploadDate, filename);
 
     // Generate presigned URL using configurable timeout
@@ -57,7 +71,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Create upload job ID for tracking
-    const jobId = require('crypto').randomBytes(16).toString('hex');
+    const jobId = crypto.randomUUID();
 
     return NextResponse.json({
       success: true,
@@ -68,7 +82,9 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error generating presigned URL:', error);
+    r2Logger.error('Error generating presigned URL', { 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
     return NextResponse.json(
       { error: 'Failed to generate presigned URL' },
       { status: 500 }

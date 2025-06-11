@@ -29,4 +29,14 @@ export function getUserRole(userEmail: string): 'admin' | 'user' {
 export function isAdminEmail(email: string): boolean {
   const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || []
   return adminEmails.includes(email)
+}
+
+/**
+ * Server-side function to check if current user is admin
+ * Used in API routes and server components
+ */
+export function getIsAdmin(userEmail?: string): boolean {
+  if (!userEmail) return false
+  const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || []
+  return adminEmails.includes(userEmail)
 } 

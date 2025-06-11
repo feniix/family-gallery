@@ -89,7 +89,7 @@ export function PhotoGrid({ onPhotoClick, onMediaUpdate }: PhotoGridProps) {
         }
         setHasMore(data.pagination.hasMore);
         
-      } catch (err) {
+      } catch {
         toast.error('Failed to load more photos');
       } finally {
         setLoadingMore(false);

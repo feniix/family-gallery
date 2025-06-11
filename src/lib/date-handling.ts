@@ -1,4 +1,5 @@
 import { ExifMetadata, DateProcessingResult } from '@/types/media';
+import { uploadLogger } from './logger';
 // Using basic date formatting instead of date-fns for now
 function formatDate(date: Date): string {
   return date.toISOString().replace('T', ' ').substring(0, 19);
@@ -11,21 +12,19 @@ export async function processDateWithFallbacks(
   file: File,
   exifData?: ExifMetadata | null
 ): Promise<DateProcessingResult> {
-  console.log(`Processing date for ${file.name}:`, {
-    hasExifData: !!exifData,
-    hasDateTimeOriginal: !!exifData?.dateTimeOriginal,
-    hasDateTime: !!exifData?.dateTime,
-    hasDateTimeDigitized: !!exifData?.dateTimeDigitized,
-    exifDates: {
-      dateTimeOriginal: exifData?.dateTimeOriginal,
-      dateTime: exifData?.dateTime,
-      dateTimeDigitized: exifData?.dateTimeDigitized
-    }
+  uploadLogger.debug('Processing date for file', {
+    fileName: file.name,
+    fileSize: file.size,
+    lastModified: file.lastModified,
+    hasMetadata: !!exifData
   });
 
   // Strategy 1: Use EXIF DateTimeOriginal (highest priority)
   if (exifData?.dateTimeOriginal) {
-    console.log(`Using EXIF DateTimeOriginal for ${file.name}: ${exifData.dateTimeOriginal}`);
+    uploadLogger.debug('Using EXIF DateTimeOriginal', { 
+      fileName: file.name, 
+      date: exifData.dateTimeOriginal 
+    });
     return {
       takenAt: exifData.dateTimeOriginal,
       dateSource: 'exif',
@@ -36,7 +35,10 @@ export async function processDateWithFallbacks(
   
   // Strategy 2: Use other EXIF date fields
   if (exifData?.dateTime) {
-    console.log(`Using EXIF DateTime for ${file.name}: ${exifData.dateTime}`);
+    uploadLogger.debug('Using EXIF DateTime', { 
+      fileName: file.name, 
+      date: exifData.dateTime 
+    });
     return {
       takenAt: exifData.dateTime,
       dateSource: 'exif',
@@ -46,7 +48,10 @@ export async function processDateWithFallbacks(
   }
   
   if (exifData?.dateTimeDigitized) {
-    console.log(`Using EXIF DateTimeDigitized for ${file.name}: ${exifData.dateTimeDigitized}`);
+    uploadLogger.debug('Using EXIF DateTimeDigitized', { 
+      fileName: file.name, 
+      date: exifData.dateTimeDigitized 
+    });
     return {
       takenAt: exifData.dateTimeDigitized,
       dateSource: 'exif',
@@ -58,7 +63,10 @@ export async function processDateWithFallbacks(
   // Strategy 3: Extract date from filename
   const filenameDate = extractDateFromFilename(file.name);
   if (filenameDate) {
-    console.log(`Using filename date for ${file.name}: ${filenameDate}`);
+    uploadLogger.debug('Using filename date', { 
+      fileName: file.name, 
+      date: filenameDate.toISOString() 
+    });
     return {
       takenAt: filenameDate,
       dateSource: 'filename',
@@ -67,20 +75,29 @@ export async function processDateWithFallbacks(
   }
   
   // Strategy 4: Use file lastModified as fallback
-  const fileDate = new Date(file.lastModified);
-  if (!isNaN(fileDate.getTime()) && fileDate.getFullYear() > 2000) {
-    console.log(`Using file lastModified for ${file.name}: ${fileDate}`);
-    return {
-      takenAt: fileDate,
-      dateSource: 'file-creation',
-      confidence: 'low',
-    };
+  if (file.lastModified) {
+    const fileDate = new Date(file.lastModified);
+    if (!isNaN(fileDate.getTime()) && fileDate.getFullYear() > 2000) {
+      uploadLogger.debug('Using file lastModified', { 
+        fileName: file.name, 
+        date: fileDate.toISOString() 
+      });
+      return {
+        takenAt: fileDate,
+        dateSource: 'file-creation',
+        confidence: 'low',
+      };
+    }
   }
   
   // Strategy 5: Use current upload time as last resort
-  console.log(`Using current time as fallback for ${file.name}`);
+  const fallbackDate = new Date();
+  uploadLogger.warn('Using current time as fallback', { 
+    fileName: file.name, 
+    date: fallbackDate.toISOString() 
+  });
   return {
-    takenAt: new Date(),
+    takenAt: fallbackDate,
     dateSource: 'upload-time',
     confidence: 'low',
   };
@@ -163,11 +180,14 @@ function extractDateFromFilename(filename: string): Date | null {
             month >= 0 && month <= 11 &&
             day >= 1 && day <= 31) {
           
-                     console.log(`Extracted date from filename ${filename}: ${formatDate(date)}`);
+          uploadLogger.debug('Extracted date from filename', { 
+            filename, 
+            date: formatDate(date) 
+          });
           return date;
         }
       } catch (error) {
-        console.warn(`Failed to parse date from filename ${filename}:`, error);
+        uploadLogger.warn('Failed to parse date from filename', { filename, error });
       }
     }
   }

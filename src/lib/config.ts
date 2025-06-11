@@ -56,6 +56,17 @@ export const r2Config = {
 } as const;
 
 /**
+ * Logging configuration
+ */
+export const loggingConfig = {
+  // Log level (trace, debug, info, warn, error, fatal)
+  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+  
+  // Enable performance timing logs
+  enablePerformanceTiming: process.env.LOG_PERFORMANCE === 'true',
+} as const;
+
+/**
  * Helper functions
  */
 

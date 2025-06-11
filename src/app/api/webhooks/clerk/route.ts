@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import { Webhook } from 'svix'
+import { authLogger } from '@/lib/logger'
 
 interface ClerkWebhookEvent {
   type: string
@@ -52,10 +53,8 @@ export async function POST(req: NextRequest) {
       'svix-signature': svix_signature,
     }) as ClerkWebhookEvent
   } catch (err) {
-    console.error('Error verifying webhook:', err)
-    return new Response('Error occurred', {
-      status: 400,
-    })
+    authLogger.error('Error verifying webhook', { error: err })
+    return NextResponse.json({ message: 'Invalid signature' }, { status: 400 })
   }
 
   // Handle the webhook
@@ -63,24 +62,30 @@ export async function POST(req: NextRequest) {
 
   if (eventType === 'user.created') {
     try {
-      const email = evt.data.email_addresses[0]?.email_address
+      if (!evt.data.email_addresses || evt.data.email_addresses.length === 0) {
+        authLogger.error('No email found in user.created event', { 
+          userId: evt.data.id 
+        })
+        return NextResponse.json({ message: 'No email found' }, { status: 400 })
+      }
+
+      const email = evt.data.email_addresses[0].email_address
       const firstName = evt.data.first_name || ''
       const lastName = evt.data.last_name || ''
       const provider = evt.data.external_accounts?.[0]?.provider || 'clerk'
 
-      if (!email) {
-        console.error('No email found in user.created event')
-        return new Response('No email found', { status: 400 })
-      }
-
-      // TODO: In Stage 1.3, we'll implement JSON database operations
-      // For now, just log the user creation
-      console.log('User created:', { id: evt.data.id, email, firstName, lastName, provider })
+      authLogger.info('User created', { 
+        id: evt.data.id, 
+        email, 
+        firstName, 
+        lastName, 
+        provider 
+      })
 
       return NextResponse.json({ success: true, user: { id: evt.data.id, email, firstName, lastName, provider } })
     } catch (error) {
-      console.error('Error processing user.created webhook:', error)
-      return new Response('Error processing webhook', { status: 500 })
+      authLogger.error('Error processing user.created webhook', { error })
+      return NextResponse.json({ message: 'Error processing webhook' }, { status: 500 })
     }
   }
 

@@ -1,10 +1,16 @@
 import { FileNamingResult } from '@/types/media';
+import { uploadLogger } from './logger';
 
 /**
  * Generate unique filename and path based on date
  */
 export function generateUniqueFilename(originalFilename: string, takenAt: Date): FileNamingResult {
-  console.log(`Generating filename for ${originalFilename} with date: ${takenAt.toISOString()} (${takenAt.getFullYear()}/${String(takenAt.getMonth() + 1).padStart(2, '0')})`);
+  const yearMonth = `${takenAt.getFullYear()}/${String(takenAt.getMonth() + 1).padStart(2, '0')}`;
+  uploadLogger.debug('Generating filename', { 
+    originalFilename, 
+    takenAt: takenAt.toISOString(), 
+    yearMonth 
+  });
   
   const year = takenAt.getFullYear();
   const month = String(takenAt.getMonth() + 1).padStart(2, '0');

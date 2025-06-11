@@ -3,6 +3,8 @@
  * This will be implemented when we add background job processing
  */
 
+import { uploadLogger } from './logger';
+
 export interface QueuedUpload {
   id: string;
   filename: string;
@@ -17,10 +19,10 @@ export interface QueuedUpload {
  * Add upload to processing queue
  */
 export function addToUploadQueue(upload: Omit<QueuedUpload, 'id' | 'createdAt'>): string {
-  const id = require('crypto').randomBytes(16).toString('hex');
+  const id = crypto.randomUUID();
   
   // In a real implementation, this would be stored in a database
-  console.log('Added to upload queue:', { id, ...upload });
+  uploadLogger.info('Added to upload queue', { id, fileName: upload.filename, status: upload.status });
   
   return id;
 }

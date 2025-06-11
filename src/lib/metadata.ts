@@ -4,6 +4,7 @@ import { processDateWithFallbacks } from './date-handling';
 import { generateUniqueFilename } from './file-naming';
 import CryptoJS from 'crypto-js';
 import { isFileSizeValid, getFileSizeLimitDisplay } from '@/lib/config';
+import { uploadLogger } from './logger';
 
 /**
  * Process metadata for an uploaded file
@@ -18,16 +19,24 @@ export async function processMediaMetadata(
   fileNaming: FileNamingResult;
   hash: string;
 }> {
-  console.log(`Processing metadata for ${file.name}`);
+  uploadLogger.debug(`Processing metadata for ${file.name}`);
   
   // Generate file hash for duplicate detection
-  const hash = await generateFileHash(file);
+  let hash: string;
+  try {
+    hash = await generateFileHash(file);
+    uploadLogger.debug(`Generated file hash`, { filename: file.name, hashPrefix: hash.substring(0, 16) + '...' });
+  } catch (error) {
+    uploadLogger.error('Error generating file hash', { filename: file.name, error: error instanceof Error ? error.message : 'Unknown error' });
+    throw error;
+  }
   
   // Use pre-extracted EXIF data if provided, otherwise extract it
   let exifData: ExifMetadata | null = null;
   if (preExtractedExifData !== undefined) {
     exifData = preExtractedExifData;
-    console.log(`Using pre-extracted EXIF data for ${file.name}:`, {
+    uploadLogger.debug(`Using pre-extracted EXIF data`, { 
+      filename: file.name,
       hasData: !!exifData,
       hasDate: !!exifData?.dateTimeOriginal,
       camera: exifData?.make && exifData?.model ? `${exifData.make} ${exifData.model}` : 'Unknown'
@@ -111,10 +120,10 @@ async function generateFileHash(file: File): Promise<string> {
     const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
     const hash = CryptoJS.SHA256(wordArray).toString();
     
-    console.log(`Generated hash for ${file.name}: ${hash.substring(0, 16)}...`);
+    uploadLogger.debug(`Generated file hash`, { filename: file.name, hashPrefix: hash.substring(0, 16) + '...' });
     return hash;
   } catch (error) {
-    console.error('Error generating file hash:', error);
+    uploadLogger.error('Error generating file hash', { filename: file.name, error: error instanceof Error ? error.message : 'Unknown error' });
     // Fallback: use file properties
     return CryptoJS.SHA256(`${file.name}_${file.size}_${file.lastModified}`).toString();
   }
@@ -144,7 +153,7 @@ export async function extractVideoMetadata(file: File): Promise<{
     });
     
     video.addEventListener('error', () => {
-      console.error('Failed to extract video metadata');
+      uploadLogger.error('Failed to extract video metadata', { filename: file.name });
       URL.revokeObjectURL(url);
       resolve({});
     });
@@ -299,4 +308,6 @@ export function extractProbableSubjects(metadata: MediaMetadata): string[] {
   
   // Remove duplicates and return
   return [...new Set(subjects)];
-} 
+}
+
+ 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { processMediaMetadata } from '@/lib/metadata'
 import { checkForDuplicate } from '@/lib/duplicate-detection'
+import { duplicateLogger } from '@/lib/logger'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,11 +16,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`[DUPLICATE CHECK] Starting duplicate check for: ${file.name}`)
+    duplicateLogger.debug(`Starting duplicate check`, { filename: file.name, size: file.size })
 
     // Parse EXIF data if provided
     let exifData = null
     if (exifDataString) {
+      duplicateLogger.debug(`EXIF data provided`, {
+        filename: file.name,
+        exifDataLength: exifDataString.length
+      })
+      
       try {
         exifData = JSON.parse(exifDataString)
         
@@ -34,37 +40,44 @@ export async function POST(request: NextRequest) {
           exifData.dateTimeDigitized = new Date(exifData.dateTimeDigitized)
         }
         
-        console.log(`[DUPLICATE CHECK] EXIF data provided:`, {
+        duplicateLogger.debug(`EXIF data parsed successfully`, {
           hasDateTimeOriginal: !!exifData?.dateTimeOriginal,
           hasDateTime: !!exifData?.dateTime,
           hasDateTimeDigitized: !!exifData?.dateTimeDigitized
         })
       } catch (error) {
-        console.warn('Failed to parse EXIF data:', error)
-        // Continue without EXIF data
+        duplicateLogger.warn('Failed to parse EXIF data', { filename: file.name, error: error instanceof Error ? error.message : 'Unknown error' })
+        exifData = null
       }
     } else {
-      console.log(`[DUPLICATE CHECK] No EXIF data provided for ${file.name}`)
+      duplicateLogger.debug(`No EXIF data provided`, { filename: file.name })
     }
 
     // Process metadata with pre-extracted EXIF data
     const { metadata, hash } = await processMediaMetadata(file, 'upload-check', 'web', exifData)
     
-    console.log(`[DUPLICATE CHECK] Generated hash: ${hash.substring(0, 16)}...`)
-    console.log(`[DUPLICATE CHECK] Metadata takenAt: ${metadata.takenAt}`)
-    console.log(`[DUPLICATE CHECK] Date source: ${metadata.dateInfo.source}`)
+    duplicateLogger.debug(`Generated hash and processed metadata`, { 
+      filename: file.name,
+      hashPrefix: hash.substring(0, 16) + '...',
+      takenAt: metadata.takenAt,
+      dateSource: metadata.dateInfo.source
+    })
     
     // Use the photo's actual date for duplicate checking, not upload date
     const photoDate = new Date(metadata.takenAt)
-    console.log(`[DUPLICATE CHECK] Using photo date: ${photoDate.toISOString()} (${photoDate.getFullYear()})`)
+    duplicateLogger.debug(`Using photo date for duplicate check`, { 
+      filename: file.name,
+      photoDate: photoDate.toISOString(), 
+      year: photoDate.getFullYear() 
+    })
     
     // Check for duplicates using the photo's date
     const duplicateResult = await checkForDuplicate(hash, photoDate)
     
-    console.log(`[DUPLICATE CHECK] Duplicate result:`, {
+    duplicateLogger.debug(`Duplicate check result`, {
+      filename: file.name,
       isDuplicate: duplicateResult.isDuplicate,
-      existingMediaId: duplicateResult.existingMedia?.id,
-      existingFilename: duplicateResult.existingMedia?.originalFilename
+      existingFile: duplicateResult.existingMedia?.originalFilename
     })
     
     return NextResponse.json({
@@ -74,7 +87,7 @@ export async function POST(request: NextRequest) {
     })
     
   } catch (error) {
-    console.error('[DUPLICATE CHECK] Error checking for duplicate:', error)
+    duplicateLogger.error('Error checking for duplicate', { error: error instanceof Error ? error.message : 'Unknown error' })
     return NextResponse.json(
       { error: 'Failed to check for duplicate' },
       { status: 500 }

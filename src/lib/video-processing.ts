@@ -2,6 +2,15 @@
  * Video processing utilities for client-side thumbnail generation and metadata extraction
  */
 
+import { videoLogger } from './logger';
+
+export interface BrowserCompatibility {
+  supportsVideoProcessing: boolean;
+  supportsCanvas: boolean;
+  supportsWebCodecs: boolean;
+  supportsOffscreenCanvas: boolean;
+}
+
 export interface VideoMetadata {
   duration: number;
   width: number;
@@ -31,28 +40,53 @@ export interface VideoProcessingOptions {
 /**
  * Check if browser supports video processing
  */
-export function isBrowserCompatible(): boolean {
+export async function checkBrowserCompatibility(): Promise<BrowserCompatibility> {
   try {
     // Check for required APIs
     if (!HTMLVideoElement || !HTMLCanvasElement || !CanvasRenderingContext2D) {
-      return false;
+      return {
+        supportsVideoProcessing: false,
+        supportsCanvas: false,
+        supportsWebCodecs: false,
+        supportsOffscreenCanvas: false
+      };
     }
 
     // Check for createObjectURL support
     if (!URL || !URL.createObjectURL) {
-      return false;
+      return {
+        supportsVideoProcessing: false,
+        supportsCanvas: false,
+        supportsWebCodecs: false,
+        supportsOffscreenCanvas: false
+      };
     }
 
     // Test canvas toBlob support
     const canvas = document.createElement('canvas');
     if (!canvas.getContext || !canvas.toBlob) {
-      return false;
+      return {
+        supportsVideoProcessing: false,
+        supportsCanvas: false,
+        supportsWebCodecs: false,
+        supportsOffscreenCanvas: false
+      };
     }
 
-    return true;
+    return {
+      supportsVideoProcessing: true,
+      supportsCanvas: true,
+      supportsWebCodecs: true,
+      supportsOffscreenCanvas: true
+    };
   } catch (error) {
-    console.warn('Browser compatibility check failed:', error);
-    return false;
+    videoLogger.warn('Browser compatibility check failed', { error: error instanceof Error ? error.message : 'Unknown error' });
+    return {
+      supportsVideoProcessing: false,
+      supportsCanvas: false,
+      supportsWebCodecs: false,
+      supportsOffscreenCanvas: false
+    };
   }
 }
 
@@ -140,7 +174,8 @@ export async function generateVideoThumbnail(
   } = options;
 
   // Check browser compatibility first
-  if (!isBrowserCompatible()) {
+  const browserCompatibility = await checkBrowserCompatibility();
+  if (!browserCompatibility.supportsVideoProcessing) {
     const metadata = await extractVideoMetadata(videoFile, options);
     return {
       thumbnail: null,

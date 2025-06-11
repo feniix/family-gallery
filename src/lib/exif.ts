@@ -1,5 +1,6 @@
 import exifr from 'exifr';
 import { ExifMetadata } from '@/types/media';
+import { exifLogger } from './logger';
 
 /**
  * Check if we're running on the server side
@@ -67,41 +68,41 @@ const EXIF_OPTIONS = {
  * Extract EXIF metadata from an image file
  */
 export async function extractExifMetadata(file: File): Promise<ExifMetadata | null> {
-  try {
-    // Check if we're in a browser environment where EXIF extraction is supported
-    if (isServerSide() || typeof document === 'undefined') {
-      console.log(`Skipping EXIF extraction - not in browser environment for ${file.name}`);
-      return null;
-    }
+  // Only run in browser environment
+  if (typeof window === 'undefined') {
+    exifLogger.debug(`Skipping EXIF extraction - not in browser environment`, { filename: file.name });
+    return null;
+  }
 
-    // Ensure exifr is available
-    if (!exifr || typeof exifr.parse !== 'function') {
-      console.warn(`EXIF library not available or invalid for ${file.name}`);
-      return null;
-    }
+  // Check if exifr is available
+  const exifr = await import('exifr').catch(() => null);
+  if (!exifr || !exifr.default) {
+    exifLogger.warn(`EXIF library not available or invalid`, { filename: file.name });
+    return null;
+  }
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      console.log(`Skipping EXIF extraction - not an image file: ${file.name}`);
-      return null;
-    }
+  // Only process image files
+  if (!file.type.startsWith('image/')) {
+    exifLogger.debug(`Skipping EXIF extraction - not an image file`, { filename: file.name, type: file.type });
+    return null;
+  }
 
-    console.log(`Extracting EXIF data from ${file.name} (${file.type}, ${file.size} bytes)`);
+  exifLogger.debug(`Extracting EXIF data`, { filename: file.name, type: file.type, size: file.size });
 
-    // Extract EXIF data using exifr
-    const exifData = await exifr.parse(file, EXIF_OPTIONS);
+     try {
+     const exifData = await exifr.default.parse(file, EXIF_OPTIONS);
     
-    if (!exifData || Object.keys(exifData).length === 0) {
-      console.log(`No EXIF data found in ${file.name}`);
+    if (!exifData) {
+      exifLogger.debug(`No EXIF data found`, { filename: file.name });
       return null;
     }
 
-    console.log(`Successfully extracted EXIF data from ${file.name}:`, {
-      hasDateTimeOriginal: !!exifData.DateTimeOriginal,
-      hasMake: !!exifData.Make,
-      hasModel: !!exifData.Model,
+    exifLogger.debug(`Successfully extracted EXIF data`, {
+      filename: file.name,
+      fieldCount: Object.keys(exifData).length,
+      hasDateTime: !!(exifData.DateTime || exifData.DateTimeOriginal),
       hasGPS: !!(exifData.GPSLatitude && exifData.GPSLongitude),
-      fieldCount: Object.keys(exifData).length
+      camera: exifData.Make && exifData.Model ? `${exifData.Make} ${exifData.Model}` : undefined
     });
 
     // Process GPS coordinates
@@ -147,7 +148,10 @@ export async function extractExifMetadata(file: File): Promise<ExifMetadata | nu
     return cleanMetadata(metadata);
     
   } catch (error) {
-    console.error(`Failed to extract EXIF from ${file.name}:`, error);
+    exifLogger.error('Failed to extract EXIF data', { 
+      filename: file.name, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
     return null;
   }
 }
@@ -161,7 +165,7 @@ export async function extractExifMetadataFromBuffer(
   filename: string
 ): Promise<ExifMetadata | null> {
   try {
-    console.log(`Server-side EXIF extraction for ${filename} will be implemented in Stage 2.3`);
+    exifLogger.info('Server-side EXIF extraction will be implemented in Stage 2.3', { filename });
     
     // For now, return null to indicate no EXIF data
     // In Stage 2.3, we'll implement proper server-side EXIF extraction
@@ -169,7 +173,7 @@ export async function extractExifMetadataFromBuffer(
     return null;
     
   } catch (error) {
-    console.error(`Failed to extract server-side EXIF from ${filename}:`, error);
+    exifLogger.error('Failed to extract server-side EXIF', { filename, error });
     return null;
   }
 }
@@ -199,7 +203,7 @@ function extractGpsCoordinates(exifData: any): { latitude: number; longitude: nu
     
     // Validate coordinates
     if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-      console.warn('Invalid GPS coordinates:', { latitude, longitude });
+      exifLogger.warn('Invalid GPS coordinates', { latitude, longitude });
       return null;
     }
     
@@ -216,7 +220,7 @@ function extractGpsCoordinates(exifData: any): { latitude: number; longitude: nu
     return result;
     
   } catch (error) {
-    console.error('Error processing GPS coordinates:', error);
+    exifLogger.error('Error processing GPS coordinates', { error });
     return null;
   }
 }
@@ -296,11 +300,11 @@ function parseExifDate(dateValue: any): Date | null {
       return new Date(dateValue * 1000); // Assume Unix timestamp
     }
     
-    console.warn('Unable to parse EXIF date:', dateValue);
+    exifLogger.warn('Unable to parse EXIF date', { dateValue });
     return null;
     
   } catch {
-    console.error('Error parsing EXIF date:');
+    exifLogger.error('Error parsing EXIF date');
     return null;
   }
 }

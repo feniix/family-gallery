@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getMediaDb, mediaIndexDb, withRetry } from '@/lib/json-db';
+import { apiLogger } from '@/lib/logger';
 import type { MediaMetadata } from '@/types/media';
 
 /**
@@ -26,10 +27,15 @@ export async function GET(request: NextRequest) {
     try {
       // Read the media index to get which years have data
       const index = await withRetry(() => mediaIndexDb.read());
-      console.log(`[MEDIA ALL] Found ${index.years.length} years with media in index:`, index.years);
+      apiLogger.info('Fetching all media using index', { 
+        yearsInIndex: index.years.length, 
+        years: index.years,
+        requestedOffset: offset,
+        requestedLimit: limit
+      });
       
       if (index.years.length === 0) {
-        console.log('[MEDIA ALL] No years found in index, returning empty result');
+        apiLogger.info('No years found in index, returning empty result');
         return NextResponse.json({
           success: true,
           media: [],
@@ -43,10 +49,13 @@ export async function GET(request: NextRequest) {
         try {
           const mediaDb = getMediaDb(year);
           const mediaData = await withRetry(() => mediaDb.read());
-          console.log(`[MEDIA ALL] Year ${year}: found ${mediaData.media?.length || 0} media items`);
+          const itemCount = mediaData.media?.length || 0;
+          if (itemCount > 0) {
+            apiLogger.debug(`Loaded media for year ${year}`, { count: itemCount });
+          }
           return mediaData.media || [];
         } catch (error) {
-          console.log(`[MEDIA ALL] Error reading year ${year}:`, error);
+          apiLogger.warn(`Error reading year ${year}`, { error: error instanceof Error ? error.message : error });
           return [];
         }
       });
@@ -55,16 +64,18 @@ export async function GET(request: NextRequest) {
       const yearResults = await Promise.allSettled(yearPromises);
       
       // Collect all successful results
-      yearResults.forEach((result, index) => {
+      yearResults.forEach((result, yearIndex) => {
         if (result.status === 'fulfilled' && result.value.length > 0) {
           allMedia.push(...result.value);
         } else if (result.status === 'rejected') {
-          console.log(`[MEDIA ALL] Failed to load year ${index}:`, result.reason);
+          apiLogger.error(`Failed to load year at index ${yearIndex}`, { reason: result.reason });
         }
       });
       
     } catch (error) {
-      console.error('[MEDIA ALL] Error reading media index, falling back to comprehensive search:', error);
+      apiLogger.error('Error reading media index, falling back to comprehensive search', { 
+        error: error instanceof Error ? error.message : error 
+      });
       
       // Fallback: check a limited range if index fails
       const currentYear = new Date().getFullYear();
@@ -103,6 +114,12 @@ export async function GET(request: NextRequest) {
     // Apply pagination
     const paginatedMedia = allMedia.slice(offset, offset + limit);
 
+    apiLogger.info('Media fetch completed', {
+      totalFound: allMedia.length,
+      returned: paginatedMedia.length,
+      pagination: { limit, offset, hasMore: offset + limit < allMedia.length }
+    });
+
     return NextResponse.json({
       success: true,
       media: paginatedMedia,
@@ -115,7 +132,10 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error retrieving all media:', error);
+    apiLogger.error('Error retrieving all media', { 
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined
+    });
     return NextResponse.json(
       { error: 'Failed to retrieve media' },
       { status: 500 }

@@ -1,6 +1,7 @@
 import { MediaMetadata, DuplicateCheckResult } from '@/types/media';
 import { readJsonFile } from './json-db';
 import { getMetadataJsonPath } from './file-naming';
+import { dbLogger, duplicateLogger } from './logger';
 
 /**
  * Check if a file is a duplicate based on its hash
@@ -11,16 +12,22 @@ export async function checkForDuplicate(
   excludeYears: number[] = []
 ): Promise<DuplicateCheckResult> {
   try {
-    console.log(`[DUPLICATE SEARCH] Checking for hash: ${hash.substring(0, 16)}... with date: ${uploadDate.toISOString()}`)
+    dbLogger.debug('Checking for duplicate hash', { 
+      hashPrefix: hash.substring(0, 16),
+      uploadDate: uploadDate.toISOString()
+    });
     
     // Check current year first
     const currentYear = uploadDate.getFullYear();
-    console.log(`[DUPLICATE SEARCH] Checking current year: ${currentYear}`)
+    dbLogger.debug('Checking current year for duplicates', { currentYear });
     
     const currentYearResult = await checkYearForDuplicate(hash, currentYear);
     
     if (currentYearResult.isDuplicate) {
-      console.log(`[DUPLICATE SEARCH] Found duplicate in current year ${currentYear}`)
+      dbLogger.info('Duplicate found in current year', { 
+        currentYear,
+        hashPrefix: hash.substring(0, 16)
+      });
       return currentYearResult;
     }
     
@@ -29,22 +36,28 @@ export async function checkForDuplicate(
       year => !excludeYears.includes(year) && year >= 2000 && year <= new Date().getFullYear() + 1
     );
     
-    console.log(`[DUPLICATE SEARCH] Also checking adjacent years: ${yearsToCheck.join(', ')}`)
+    dbLogger.debug('Checking adjacent years for duplicates', { yearsToCheck });
     
     for (const year of yearsToCheck) {
-      console.log(`[DUPLICATE SEARCH] Checking year ${year}...`)
+      dbLogger.trace('Checking specific year', { year });
       const yearResult = await checkYearForDuplicate(hash, year);
       if (yearResult.isDuplicate) {
-        console.log(`[DUPLICATE SEARCH] Found duplicate in year ${year}`)
+        dbLogger.info('Duplicate found in adjacent year', { 
+          year,
+          hashPrefix: hash.substring(0, 16)
+        });
         return yearResult;
       }
     }
     
-    console.log(`[DUPLICATE SEARCH] No duplicates found for hash ${hash.substring(0, 16)}...`)
+    dbLogger.debug('No duplicates found', { hashPrefix: hash.substring(0, 16) });
     return { isDuplicate: false, hash };
     
   } catch (error) {
-    console.error('[DUPLICATE SEARCH] Error checking for duplicates:', error);
+    dbLogger.error('Error checking for duplicates', { 
+      error: error instanceof Error ? error.message : error,
+      hashPrefix: hash.substring(0, 16)
+    });
     // In case of error, assume not duplicate to allow upload
     return { isDuplicate: false, hash };
   }
@@ -54,47 +67,62 @@ export async function checkForDuplicate(
  * Check for duplicates within a specific year
  */
 async function checkYearForDuplicate(hash: string, year: number): Promise<DuplicateCheckResult> {
+  duplicateLogger.debug(`Checking year for duplicates`, { year, hash: hash.substring(0, 16) + '...', uploadDate: new Date(year, 0, 1).toISOString() });
+  
   try {
     const jsonPath = getMetadataJsonPath(new Date(year, 0, 1));
-    console.log(`[DUPLICATE YEAR SEARCH] Checking ${year}: looking for file at ${jsonPath}`)
+    duplicateLogger.debug(`Looking for file`, { year, jsonPath });
     
     const yearData = await readJsonFile(jsonPath);
-    
-    if (!yearData || !yearData.media || !Array.isArray(yearData.media)) {
-      console.log(`[DUPLICATE YEAR SEARCH] No data found for year ${year} (file doesn't exist or empty)`)
+    if (!yearData || !yearData.media || yearData.media.length === 0) {
+      duplicateLogger.debug(`No data found for year`, { year, reason: 'file_not_exist_or_empty' });
       return { isDuplicate: false, hash };
     }
+
+    duplicateLogger.info(`Found media items in year database`, { year, mediaCount: yearData.media.length });
     
-    console.log(`[DUPLICATE YEAR SEARCH] Found ${yearData.media.length} media items in ${year} database`)
-    
-    // Log all files in this year for debugging
-    console.log(`[DUPLICATE YEAR SEARCH] Files in ${year} database:`)
-    yearData.media.forEach((media: MediaMetadata, index: number) => {
-      console.log(`  ${index + 1}. ${media.originalFilename} - Hash: ${media.metadata?.hash?.substring(0, 16)}... - Date: ${media.takenAt}`)
-    })
-    
-    // Search for existing media with the same hash
-    const existingMedia = yearData.media.find((media: MediaMetadata) => {
-      const mediaHash = media.metadata?.hash;
-      console.log(`[DUPLICATE YEAR SEARCH] Comparing hash ${hash.substring(0, 16)}... with ${mediaHash?.substring(0, 16)}... (${media.originalFilename})`);
-      return mediaHash === hash;
+    duplicateLogger.debug(`Files in year database`, { 
+      year, 
+      files: yearData.media.map((media: MediaMetadata, index: number) => ({
+        index: index + 1,
+        filename: media.originalFilename,
+        hashPrefix: media.metadata?.hash?.substring(0, 16) + '...',
+        takenAt: media.takenAt
+      }))
     });
-    
-    if (existingMedia) {
-      console.log(`[DUPLICATE YEAR SEARCH] ✅ DUPLICATE FOUND: ${existingMedia.originalFilename} (${existingMedia.id})`);
-      return {
-        isDuplicate: true,
-        existingMedia,
-        hash,
-      };
+
+    for (const media of yearData.media) {
+      const mediaHash = media.metadata?.hash;
+      if (mediaHash) {
+        duplicateLogger.debug(`Comparing hashes`, {
+          targetHash: hash.substring(0, 16) + '...',
+          mediaHash: mediaHash.substring(0, 16) + '...',
+          filename: media.originalFilename
+        });
+        
+        if (mediaHash === hash) {
+          const existingMedia = { ...media };
+          duplicateLogger.info(`Duplicate found`, {
+            filename: existingMedia.originalFilename,
+            id: existingMedia.id,
+            year
+          });
+          return {
+            isDuplicate: true,
+            existingMedia,
+            hash,
+          };
+        }
+      }
     }
-    
-    console.log(`[DUPLICATE YEAR SEARCH] No matching hash found in ${year} database`)
+
+    duplicateLogger.debug(`No matching hash found in year database`, { year });
     return { isDuplicate: false, hash };
-    
   } catch (error) {
-    // If file doesn't exist or can't be read, no duplicates in this year
-    console.log(`[DUPLICATE YEAR SEARCH] Error reading ${year} database:`, error instanceof Error ? error.message : 'Unknown error');
+    duplicateLogger.error(`Error reading year database`, { 
+      year, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
     return { isDuplicate: false, hash };
   }
 }
@@ -108,9 +136,14 @@ export async function findSimilarMedia(
 ): Promise<MediaMetadata[]> {
   const similarMedia: MediaMetadata[] = [];
   
-  try {
-    const years = searchYears.length > 0 ? searchYears : 
-      [new Date().getFullYear(), new Date().getFullYear() - 1];
+      try {
+      duplicateLogger.debug('Finding similar media', { 
+        filename: metadata.originalFilename,
+        searchYears: searchYears.length > 0 ? searchYears : 'all_years'
+      });
+
+      const years = searchYears.length > 0 ? searchYears : 
+        [new Date().getFullYear(), new Date().getFullYear() - 1];
     
     for (const year of years) {
       const yearSimilar = await findSimilarInYear(metadata, year);
@@ -119,10 +152,10 @@ export async function findSimilarMedia(
     
     return similarMedia;
     
-  } catch (error) {
-    console.error('Error finding similar media:', error);
-    return [];
-  }
+      } catch (error) {
+      duplicateLogger.error('Error finding similar media', { error: error instanceof Error ? error.message : 'Unknown error' });
+      return [];
+    }
 }
 
 /**
@@ -153,10 +186,13 @@ async function findSimilarInYear(
     
     return similar;
     
-  } catch (error) {
-    console.log(`No metadata file for year ${year} or error reading:`, error instanceof Error ? error.message : 'Unknown error');
-    return [];
-  }
+      } catch (error) {
+      duplicateLogger.warn(`No metadata file for year ${year} or error reading`, { 
+        year, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+      return [];
+    }
 }
 
 /**
@@ -265,14 +301,18 @@ export async function removeDuplicate(mediaId: string, year: number): Promise<bo
     // Save updated data if something was removed
     if (yearData.media.length < initialLength) {
       // This would need to use writeJsonFile, but we'll implement that later
-      console.log(`Would remove duplicate media ${mediaId} from year ${year}`);
+      duplicateLogger.info(`Would remove duplicate media (dry run)`, { mediaId, year });
       return true;
     }
     
     return false;
     
   } catch (error) {
-    console.error('Error removing duplicate:', error);
+    duplicateLogger.error('Error removing duplicate', { 
+      mediaId, 
+      year, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
     return false;
   }
 }
@@ -342,7 +382,9 @@ export async function getDuplicateStats(years: number[] = []): Promise<{
     return stats;
     
   } catch (error) {
-    console.error('Error calculating duplicate stats:', error);
+    duplicateLogger.error('Error calculating duplicate stats', { 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
     return stats;
   }
 }
@@ -366,7 +408,9 @@ export async function batchCheckDuplicates(
     return results;
     
   } catch (error) {
-    console.error('Error in batch duplicate check:', error);
+    duplicateLogger.error('Error in batch duplicate check', { 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
     
     // Return empty results for all files in case of error
     for (const file of files) {

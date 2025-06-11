@@ -9,6 +9,7 @@ import { processVideoFile } from './video-processing';
 import { generateUniqueFilename } from './file-naming';
 import { checkForDuplicate } from './duplicate-detection';
 import { MediaMetadata } from '../types/media';
+import { uploadLogger } from './logger';
 
 export interface UploadTransactionOptions {
   userId: string;
@@ -102,7 +103,10 @@ export class UploadTransactionManager {
           await this.rollbackTransaction(transaction);
           transaction.status = 'rolled-back';
         } catch (rollbackError) {
-          console.error('Rollback failed:', rollbackError);
+          uploadLogger.error('Rollback failed', { 
+            transactionId: transaction.id, 
+            error: rollbackError 
+          });
         }
       }
       
@@ -311,7 +315,10 @@ export class UploadTransactionManager {
       // Add cleanup function to delete uploaded file if needed
       step.cleanup = async () => {
         // Note: Could implement R2 delete here if needed
-        console.log(`Would clean up uploaded file: ${originalFilePath}`);
+        uploadLogger.info('Would clean up uploaded file', { 
+          originalFilePath, 
+          dryRun: true 
+        });
       };
     });
 
@@ -321,7 +328,10 @@ export class UploadTransactionManager {
         await uploadFileToR2(thumbnailFile, thumbnailPresignedUrl);
         
         step.cleanup = async () => {
-          console.log(`Would clean up uploaded thumbnail: ${thumbnailFilePath}`);
+          uploadLogger.info('Would clean up uploaded thumbnail', { 
+            thumbnailFilePath, 
+            dryRun: true 
+          });
         };
       });
     } else {
@@ -341,11 +351,16 @@ export class UploadTransactionManager {
        
        // Update the media index to include this year
        await addYearToIndex(year);
-       console.log(`[TRANSACTION] Added year ${year} to media index`);
+       uploadLogger.info('Added year to media index', { 
+         transactionId: transaction.id, 
+         year 
+       });
 
        // Update total media count in index
        await updateIndexMediaCount();
-       console.log(`[TRANSACTION] Updated media index total count`);
+       uploadLogger.info('Updated media index total count', { 
+         transactionId: transaction.id 
+       });
        
        step.data = { mediaId: finalMetadata.id };
        
@@ -356,9 +371,14 @@ export class UploadTransactionManager {
              data.media = data.media.filter(m => m.id !== finalMetadata.id);
              return data;
            });
-           console.log(`Removed from database: ${finalMetadata.id}`);
+           uploadLogger.info('Removed from database', { 
+             mediaId: finalMetadata.id 
+           });
          } catch (error) {
-           console.error('Failed to clean up database entry:', error);
+           uploadLogger.error('Failed to clean up database entry', { 
+             mediaId: finalMetadata.id, 
+             error 
+           });
          }
        };
      });
@@ -417,7 +437,10 @@ export class UploadTransactionManager {
    * Rollback transaction by executing cleanup functions
    */
   private async rollbackTransaction(transaction: UploadTransaction): Promise<void> {
-    console.log(`Rolling back transaction ${transaction.id}`);
+    uploadLogger.info('Rolling back transaction', { 
+      transactionId: transaction.id, 
+      stepCount: transaction.steps.length 
+    });
     
     // Execute cleanup functions in reverse order
     const completedSteps = transaction.steps
@@ -430,7 +453,12 @@ export class UploadTransactionManager {
           await step.cleanup();
         }
       } catch (error) {
-        console.error(`Failed to cleanup step ${step.id}:`, error);
+        uploadLogger.error('Failed to cleanup step', { 
+          transactionId: transaction.id, 
+          stepId: step.id, 
+          stepType: step.type, 
+          error 
+        });
       }
     }
   }

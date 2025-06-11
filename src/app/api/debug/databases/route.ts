@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { readJsonFile } from '@/lib/json-db'
+import { dbLogger } from '@/lib/logger'
 
 export async function GET() {
   try {
@@ -36,7 +37,7 @@ export async function GET() {
     return NextResponse.json(results)
     
   } catch (error) {
-    console.error('Error checking databases:', error)
+    dbLogger.error('Error checking databases', { error })
     return NextResponse.json(
       { error: 'Failed to check databases' },
       { status: 500 }

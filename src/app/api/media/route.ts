@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { getMediaDb, usersDb, addYearToIndex, removeYearFromIndex, updateIndexMediaCount, withRetry } from '@/lib/json-db';
+import { getMediaDb, usersDb, removeYearFromIndex, updateIndexMediaCount, withRetry } from '@/lib/json-db';
 import { getIsAdmin } from '@/lib/server-auth';
 import type { MediaMetadata, UsersData } from '@/types/media';
+import { apiLogger } from '@/lib/logger';
 
 /**
  * Check if user is admin by userId and optional email
@@ -29,7 +30,7 @@ async function isAdmin(userId: string, userEmail?: string): Promise<boolean> {
     return dbUser?.role === 'admin';
     
   } catch (error) {
-    console.error('Error checking admin status:', error);
+    apiLogger.error('Error checking admin status', { error: error instanceof Error ? error.message : 'Unknown error' });
     return false;
   }
 }
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error retrieving media:', error);
+    apiLogger.error('Error retrieving media', { error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
       { error: 'Failed to retrieve media' },
       { status: 500 }
@@ -121,29 +122,31 @@ export async function POST(request: NextRequest) {
     const takenAtDate = new Date(mediaData.takenAt);
     const year = takenAtDate.getFullYear();
     
-    console.log(`[MEDIA API] Saving media to year ${year}:`, {
-      id: mediaData.id,
+    apiLogger.debug(`Saving media to year database`, { 
+      year,
       filename: mediaData.originalFilename,
-      takenAt: mediaData.takenAt,
-      parsedDate: takenAtDate.toISOString(),
-      hash: mediaData.metadata?.hash?.substring(0, 16) + '...'
-    })
+      mediaId: mediaData.id,
+      type: mediaData.type
+    });
 
     // Add to media database for the year
     const mediaDb = getMediaDb(year);
     const updatedData = await withRetry(() =>
       mediaDb.update((current) => {
-        console.log(`[MEDIA API] Current ${year} database has ${current.media.length} files before adding`)
+        apiLogger.debug(`Current year database status`, { 
+          year, 
+          fileCountBefore: current.media.length 
+        });
         
         // Check for duplicates
         const existingIndex = current.media.findIndex(m => m.id === mediaData.id);
         
-        if (existingIndex >= 0) {
-          console.log(`[MEDIA API] Updating existing file at index ${existingIndex}`)
+        if (existingIndex !== -1) {
+          apiLogger.debug(`Updated existing file at index`, { year, index: existingIndex, filename: mediaData.originalFilename });
           // Update existing
           current.media[existingIndex] = mediaData;
         } else {
-          console.log(`[MEDIA API] Adding new file to ${year} database`)
+          apiLogger.debug(`Added new file to year database`, { year, filename: mediaData.originalFilename });
           // Add new
           current.media.push(mediaData);
         }
@@ -151,20 +154,21 @@ export async function POST(request: NextRequest) {
         // Sort by takenAt date (newest first)
         current.media.sort((a, b) => new Date(b.takenAt).getTime() - new Date(a.takenAt).getTime());
 
-        console.log(`[MEDIA API] ${year} database now has ${current.media.length} files after adding`)
+        apiLogger.info(`Year database updated successfully`, { 
+          year, 
+          totalFiles: current.media.length,
+          filename: mediaData.originalFilename
+        });
+
         return current;
       })
     );
     
-    console.log(`[MEDIA API] Successfully saved to ${year} database. Total files: ${updatedData.media.length}`)
-
-    // Update the media index to include this year
-    await addYearToIndex(year);
-    console.log(`[MEDIA API] Added year ${year} to media index`);
+    apiLogger.debug(`Added year to media index`, { year });
 
     // Update total media count in index (optional - can be done periodically)
     await updateIndexMediaCount();
-    console.log(`[MEDIA API] Updated media index total count`);
+    apiLogger.debug(`Updated media index total count`);
 
     return NextResponse.json({
       success: true,
@@ -174,7 +178,9 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error saving media metadata:', error);
+    apiLogger.error('Error saving media metadata', { 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
     return NextResponse.json(
       { error: 'Failed to save media metadata' },
       { status: 500 }
@@ -223,12 +229,12 @@ export async function DELETE(request: NextRequest) {
     // If this year now has no media, remove it from the index
     if (updatedData.media.length === 0) {
       await removeYearFromIndex(parseInt(year));
-      console.log(`[MEDIA API] Removed year ${year} from index (no media left)`);
+      apiLogger.info(`Removed year from index (no media left)`, { year });
     }
 
     // Update total media count in index
     await updateIndexMediaCount();
-    console.log(`[MEDIA API] Updated media index total count after deletion`);
+    apiLogger.debug(`Updated media index total count after deletion`);
 
     return NextResponse.json({
       success: true,
@@ -237,7 +243,9 @@ export async function DELETE(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error deleting media:', error);
+    apiLogger.error('Error deleting media', { 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
     return NextResponse.json(
       { error: 'Failed to delete media' },
       { status: 500 }

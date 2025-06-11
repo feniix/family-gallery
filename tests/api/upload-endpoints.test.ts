@@ -1,20 +1,21 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { createMockNextRequest } from '../utils/test-helpers';
 
 // Mock the external dependencies
 jest.mock('@clerk/nextjs/server', () => ({
-  auth: jest.fn(() => Promise.resolve({ userId: 'test-admin-user-id' }))
+  auth: jest.fn()
 }));
 
 jest.mock('@/lib/r2', () => ({
-  generatePresignedUploadUrl: jest.fn(() => Promise.resolve('https://test-presigned-url.com')),
-  isValidFileType: jest.fn(() => true),
+  generatePresignedUploadUrl: jest.fn(),
+  isValidFileType: jest.fn(),
   generateFilePath: {
-    original: jest.fn(() => '2024/01/test-file.jpg')
+    original: jest.fn()
   }
 }));
 
 jest.mock('@/lib/auth', () => ({
-  getIsAdmin: jest.fn(() => true)
+  getIsAdmin: jest.fn()
 }));
 
 describe('Upload API Endpoints', () => {
@@ -22,6 +23,17 @@ describe('Upload API Endpoints', () => {
   beforeEach(() => {
     // Reset all mocks before each test
     jest.clearAllMocks();
+    
+    // Set up default mock implementations
+    const { auth } = require('@clerk/nextjs/server');
+    const { generatePresignedUploadUrl, isValidFileType, generateFilePath } = require('@/lib/r2');
+    const { getIsAdmin } = require('@/lib/auth');
+    
+    auth.mockResolvedValue({ userId: 'test-admin-user-id' });
+    generatePresignedUploadUrl.mockResolvedValue('https://test-presigned-url.com');
+    isValidFileType.mockReturnValue(true);
+    generateFilePath.original.mockReturnValue('2024/01/test-file.jpg');
+    getIsAdmin.mockReturnValue(true);
   });
 
   describe('POST /api/upload/presigned', () => {
@@ -29,9 +41,8 @@ describe('Upload API Endpoints', () => {
     it('should generate presigned URL for valid request', async () => {
       const { POST } = await import('@/app/api/upload/presigned/route');
       
-      const request = new Request('http://localhost:8080/api/upload/presigned', {
+      const request = createMockNextRequest('http://localhost:8080/api/upload/presigned', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           filename: 'test-image.jpg',
           contentType: 'image/jpeg',
@@ -52,14 +63,13 @@ describe('Upload API Endpoints', () => {
 
     it('should reject request without authentication', async () => {
       // Mock unauthenticated user
-      const { auth } = await import('@clerk/nextjs/server');
-      (auth as jest.Mock).mockResolvedValueOnce({ userId: null });
+      const { auth } = require('@clerk/nextjs/server');
+      auth.mockResolvedValueOnce({ userId: null });
 
       const { POST } = await import('@/app/api/upload/presigned/route');
       
-      const request = new Request('http://localhost:8080/api/upload/presigned', {
+      const request = createMockNextRequest('http://localhost:8080/api/upload/presigned', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           filename: 'test-image.jpg',
           contentType: 'image/jpeg'
@@ -71,14 +81,13 @@ describe('Upload API Endpoints', () => {
     });
 
     it('should reject invalid file types', async () => {
-      const { isValidFileType } = await import('@/lib/r2');
-      (isValidFileType as jest.Mock).mockReturnValueOnce(false);
+      const { isValidFileType } = require('@/lib/r2');
+      isValidFileType.mockReturnValueOnce(false);
 
       const { POST } = await import('@/app/api/upload/presigned/route');
       
-      const request = new Request('http://localhost:8080/api/upload/presigned', {
+      const request = createMockNextRequest('http://localhost:8080/api/upload/presigned', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           filename: 'test-document.pdf',
           contentType: 'application/pdf'
@@ -95,9 +104,8 @@ describe('Upload API Endpoints', () => {
     it('should reject files over size limit', async () => {
       const { POST } = await import('@/app/api/upload/presigned/route');
       
-      const request = new Request('http://localhost:8080/api/upload/presigned', {
+      const request = createMockNextRequest('http://localhost:8080/api/upload/presigned', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           filename: 'large-file.jpg',
           contentType: 'image/jpeg',
@@ -115,9 +123,8 @@ describe('Upload API Endpoints', () => {
     it('should handle missing required fields', async () => {
       const { POST } = await import('@/app/api/upload/presigned/route');
       
-      const request = new Request('http://localhost:8080/api/upload/presigned', {
+      const request = createMockNextRequest('http://localhost:8080/api/upload/presigned', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           // Missing filename and contentType
           fileSize: 1000000
@@ -135,24 +142,6 @@ describe('Upload API Endpoints', () => {
   describe('POST /api/upload/check-duplicate', () => {
     
     it('should check for duplicates with EXIF data', async () => {
-      // Mock the duplicate detection
-      jest.mock('@/lib/duplicate-detection', () => ({
-        checkForDuplicate: jest.fn(() => Promise.resolve({
-          isDuplicate: false,
-          duplicateInfo: null
-        }))
-      }));
-
-      jest.mock('@/lib/metadata', () => ({
-        processMediaMetadata: jest.fn(() => Promise.resolve({
-          metadata: {
-            filename: 'test-image.jpg',
-            hash: 'test-hash-123'
-          },
-          hash: 'test-hash-123'
-        }))
-      }));
-
       const { POST } = await import('@/app/api/upload/check-duplicate/route');
       
       // Create a FormData with file and EXIF data
@@ -165,7 +154,7 @@ describe('Upload API Endpoints', () => {
         model: 'iPhone 13'
       }));
 
-      const request = new Request('http://localhost:8080/api/upload/check-duplicate', {
+      const request = createMockNextRequest('http://localhost:8080/api/upload/check-duplicate', {
         method: 'POST',
         body: formData
       });
@@ -184,7 +173,7 @@ describe('Upload API Endpoints', () => {
       const formData = new FormData();
       // No file added
 
-      const request = new Request('http://localhost:8080/api/upload/check-duplicate', {
+      const request = createMockNextRequest('http://localhost:8080/api/upload/check-duplicate', {
         method: 'POST',
         body: formData
       });
@@ -200,19 +189,17 @@ describe('Upload API Endpoints', () => {
   describe('POST /api/media', () => {
     
     it('should add media metadata to database', async () => {
-      // Mock database operations
-      jest.mock('@/lib/db', () => ({
-        addMediaToDatabase: jest.fn(() => Promise.resolve({ success: true, id: 'test-media-id' }))
-      }));
-
       const { POST } = await import('@/app/api/media/route');
       
-      const request = new Request('http://localhost:8080/api/media', {
+      const request = createMockNextRequest('http://localhost:8080/api/media', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: 'test-media-id',
           filename: 'test-image.jpg',
-          filePath: '2024/01/test-image.jpg',
+          originalFilename: 'test-image.jpg',
+          path: '2024/01/test-image.jpg',
+          type: 'image',
+          takenAt: '2024-01-01T12:00:00Z',
           metadata: {
             dateTimeOriginal: '2024-01-01T12:00:00Z',
             camera: { make: 'Apple', model: 'iPhone 13' },
@@ -227,21 +214,25 @@ describe('Upload API Endpoints', () => {
       
       const data = await response.json();
       expect(data).toHaveProperty('success', true);
-      expect(data).toHaveProperty('id');
+      expect(data).toHaveProperty('totalMedia');
     });
 
     it('should reject unauthorized media upload', async () => {
       // Mock non-admin user
-      const { getIsAdmin } = await import('@/lib/auth');
-      (getIsAdmin as jest.Mock).mockReturnValueOnce(false);
+      const { getIsAdmin } = require('@/lib/server-auth');
+      getIsAdmin.mockResolvedValueOnce(false);
 
       const { POST } = await import('@/app/api/media/route');
       
-      const request = new Request('http://localhost:8080/api/media', {
+      const request = createMockNextRequest('http://localhost:8080/api/media', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: 'test-media-id',
           filename: 'test-image.jpg',
+          originalFilename: 'test-image.jpg',
+          path: '2024/01/test-image.jpg',
+          type: 'image',
+          takenAt: '2024-01-01T12:00:00Z',
           metadata: {}
         })
       });
@@ -256,9 +247,8 @@ describe('Upload API Endpoints', () => {
     it('should handle malformed JSON in presigned request', async () => {
       const { POST } = await import('@/app/api/upload/presigned/route');
       
-      const request = new Request('http://localhost:8080/api/upload/presigned', {
+      const request = createMockNextRequest('http://localhost:8080/api/upload/presigned', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: 'invalid-json'
       });
 
@@ -268,14 +258,13 @@ describe('Upload API Endpoints', () => {
 
     it('should handle network errors gracefully', async () => {
       // Mock R2 service failure
-      const { generatePresignedUploadUrl } = await import('@/lib/r2');
-      (generatePresignedUploadUrl as jest.Mock).mockRejectedValueOnce(new Error('R2 service unavailable'));
+      const { generatePresignedUploadUrl } = require('@/lib/r2');
+      generatePresignedUploadUrl.mockRejectedValueOnce(new Error('R2 service unavailable'));
 
       const { POST } = await import('@/app/api/upload/presigned/route');
       
-      const request = new Request('http://localhost:8080/api/upload/presigned', {
+      const request = createMockNextRequest('http://localhost:8080/api/upload/presigned', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           filename: 'test-image.jpg',
           contentType: 'image/jpeg',
