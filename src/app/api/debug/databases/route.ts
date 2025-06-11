@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { readJsonFile } from '@/lib/json-db'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const results: any = {}
+    const results: Record<string, unknown> = {}
     
-    // Check common years for database files
-    const yearsToCheck = [2006, 2007, 2008, 2024, 2025]
+    // Check common years for database files including historical years
+    const yearsToCheck = [2005, 2006, 2007, 2008, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
     
     for (const year of yearsToCheck) {
       try {
@@ -15,11 +15,11 @@ export async function GET(request: NextRequest) {
           results[year] = {
             exists: true,
             mediaCount: yearData.media.length,
-            files: yearData.media.map((m: any) => ({
-              filename: m.originalFilename,
-              hash: m.metadata?.hash?.substring(0, 16) + '...',
-              takenAt: m.takenAt,
-              id: m.id
+            files: yearData.media.map((m: Record<string, unknown>) => ({
+              filename: m.originalFilename as string,
+              hash: ((m.metadata as Record<string, unknown>)?.hash as string)?.substring(0, 16) + '...',
+              takenAt: m.takenAt as string,
+              id: m.id as string
             }))
           }
         } else {

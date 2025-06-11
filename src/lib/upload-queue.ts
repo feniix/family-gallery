@@ -17,7 +17,7 @@ export interface QueuedUpload {
  * Add upload to processing queue
  */
 export function addToUploadQueue(upload: Omit<QueuedUpload, 'id' | 'createdAt'>): string {
-  const id = crypto.randomUUID();
+  const id = require('crypto').randomBytes(16).toString('hex');
   
   // In a real implementation, this would be stored in a database
   console.log('Added to upload queue:', { id, ...upload });

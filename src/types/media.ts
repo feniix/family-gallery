@@ -127,6 +127,15 @@ export interface MediaYearData {
 }
 
 /**
+ * Media index to track which years have data
+ */
+export interface MediaIndex {
+  years: number[];
+  lastUpdated: string;
+  totalMedia: number;
+}
+
+/**
  * User database structure
  */
 export interface UserData {

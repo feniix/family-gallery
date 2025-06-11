@@ -7,21 +7,18 @@ import { Button } from '@/components/ui/button'
 import { Upload, FileImage, FileVideo, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { validateVideoFile } from '@/lib/video-processing'
+import { uploadConfig, getMaxPhotoSizeDisplay, getMaxVideoSizeDisplay, isFileSizeValid, getFileSizeLimitDisplay } from '@/lib/config'
 
 interface UploadZoneProps {
   onFilesSelected: (files: File[]) => void
   disabled?: boolean
   maxFiles?: number
-  maxSize?: number // in bytes
 }
-
-
 
 export function UploadZone({ 
   onFilesSelected, 
   disabled = false, 
-  maxFiles = 50,
-  maxSize = 50 * 1024 * 1024 // 50MB default
+  maxFiles = 50
 }: UploadZoneProps) {
 
   // Validate file type
@@ -46,11 +43,6 @@ export function UploadZone({
     return false
   }, [])
 
-  // Validate file size
-  const isValidFileSize = useCallback((file: File): boolean => {
-    return file.size <= maxSize
-  }, [maxSize])
-
   // Format file size for display
   const formatFileSize = useCallback((bytes: number): string => {
     if (bytes === 0) return '0 Bytes'
@@ -66,7 +58,7 @@ export function UploadZone({
       rejectedFiles.forEach(({ file, errors }) => {
         errors.forEach((error: FileError) => {
           if (error.code === 'file-too-large') {
-            toast.error(`File "${file.name}" is too large. Maximum size is ${formatFileSize(maxSize)}.`)
+            toast.error(`File "${file.name}" is too large. Maximum size is ${getFileSizeLimitDisplay(file.type)}.`)
           } else if (error.code === 'file-invalid-type') {
             toast.error(`File "${file.name}" is not a supported format.`)
           } else if (error.code === 'too-many-files') {
@@ -84,8 +76,8 @@ export function UploadZone({
         toast.error(`File "${file.name}" is not a supported format.`)
         return false
       }
-      if (!isValidFileSize(file)) {
-        toast.error(`File "${file.name}" is too large. Maximum size is ${formatFileSize(maxSize)}.`)
+      if (!isFileSizeValid(file.size, file.type)) {
+        toast.error(`File "${file.name}" is too large. Maximum size is ${getFileSizeLimitDisplay(file.type)}.`)
         return false
       }
       return true
@@ -94,7 +86,7 @@ export function UploadZone({
     if (validFiles.length > 0) {
       onFilesSelected(validFiles)
     }
-  }, [onFilesSelected, maxFiles, maxSize, isValidFileType, isValidFileSize, formatFileSize])
+  }, [onFilesSelected, maxFiles, isValidFileType, formatFileSize])
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
@@ -104,7 +96,7 @@ export function UploadZone({
       'video/*': ['.mp4', '.mov', '.avi', '.quicktime']
     },
     maxFiles,
-    maxSize,
+    maxSize: uploadConfig.maxFileSize, // Use the larger of the two limits for dropzone
     multiple: true,
     noClick: true, // We'll handle click manually
     noKeyboard: true
@@ -164,7 +156,7 @@ export function UploadZone({
               <strong>Supported formats:</strong> JPEG, PNG, GIF, WebP, MP4, MOV, AVI
             </p>
             <p>
-              <strong>Maximum size:</strong> {formatFileSize(maxSize)} per file
+              <strong>Maximum size:</strong> {getMaxPhotoSizeDisplay()} (photos), {getMaxVideoSizeDisplay()} (videos)
             </p>
             <p>
               <strong>Maximum files:</strong> {maxFiles} files at once

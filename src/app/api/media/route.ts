@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { getMediaDb, usersDb } from '@/lib/json-db';
-import { withRetry } from '@/lib/json-db';
+import { getMediaDb, usersDb, addYearToIndex, removeYearFromIndex, updateIndexMediaCount, withRetry } from '@/lib/json-db';
 import { getIsAdmin } from '@/lib/server-auth';
 import type { MediaMetadata, UsersData } from '@/types/media';
 
@@ -159,6 +158,14 @@ export async function POST(request: NextRequest) {
     
     console.log(`[MEDIA API] Successfully saved to ${year} database. Total files: ${updatedData.media.length}`)
 
+    // Update the media index to include this year
+    await addYearToIndex(year);
+    console.log(`[MEDIA API] Added year ${year} to media index`);
+
+    // Update total media count in index (optional - can be done periodically)
+    await updateIndexMediaCount();
+    console.log(`[MEDIA API] Updated media index total count`);
+
     return NextResponse.json({
       success: true,
       message: 'Media metadata saved successfully',
@@ -212,6 +219,16 @@ export async function DELETE(request: NextRequest) {
         return current;
       })
     );
+
+    // If this year now has no media, remove it from the index
+    if (updatedData.media.length === 0) {
+      await removeYearFromIndex(parseInt(year));
+      console.log(`[MEDIA API] Removed year ${year} from index (no media left)`);
+    }
+
+    // Update total media count in index
+    await updateIndexMediaCount();
+    console.log(`[MEDIA API] Updated media index total count after deletion`);
 
     return NextResponse.json({
       success: true,

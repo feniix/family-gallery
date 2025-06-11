@@ -3,7 +3,7 @@
  */
 
 import { uploadFileToR2, getPresignedUploadUrl } from './upload';
-import { getMediaDb } from './json-db';
+import { getMediaDb, addYearToIndex, updateIndexMediaCount } from './json-db';
 import { processMediaMetadata } from './metadata';
 import { processVideoFile } from './video-processing';
 import { generateUniqueFilename } from './file-naming';
@@ -338,6 +338,14 @@ export class UploadTransactionManager {
          data.media.push(finalMetadata);
          return data;
        });
+       
+       // Update the media index to include this year
+       await addYearToIndex(year);
+       console.log(`[TRANSACTION] Added year ${year} to media index`);
+
+       // Update total media count in index
+       await updateIndexMediaCount();
+       console.log(`[TRANSACTION] Updated media index total count`);
        
        step.data = { mediaId: finalMetadata.id };
        

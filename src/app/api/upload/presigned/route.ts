@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { generatePresignedUploadUrl, isValidFileType, generateFilePath } from '@/lib/r2';
+import { uploadConfig, isFileSizeValid, getFileSizeLimitDisplay } from '@/lib/config';
 
 
 /**
@@ -35,11 +36,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (50MB limit)
-    const maxSize = 50 * 1024 * 1024; // 50MB
-    if (fileSize && fileSize > maxSize) {
+    // Validate file size using type-specific limits
+    if (fileSize && !isFileSizeValid(fileSize, contentType)) {
       return NextResponse.json(
-        { error: 'File too large. Maximum size is 50MB.' },
+        { error: `File too large. Maximum size is ${getFileSizeLimitDisplay(contentType)}.` },
         { status: 400 }
       );
     }
@@ -49,22 +49,22 @@ export async function POST(request: NextRequest) {
     console.log(`Generating presigned URL for ${filename} with date: ${uploadDate.toISOString()} (${uploadDate.getFullYear()}/${String(uploadDate.getMonth() + 1).padStart(2, '0')})`);
     const filePath = generateFilePath.original(uploadDate, filename);
 
-    // Generate presigned URL (15 minute expiration)
+    // Generate presigned URL using configurable timeout
     const presignedUrl = await generatePresignedUploadUrl(
       filePath,
       contentType,
-      900 // 15 minutes
+      uploadConfig.uploadTimeoutSeconds
     );
 
     // Create upload job ID for tracking
-    const jobId = crypto.randomUUID();
+    const jobId = require('crypto').randomBytes(16).toString('hex');
 
     return NextResponse.json({
       success: true,
       presignedUrl,
       filePath,
       jobId,
-      expiresIn: 900, // seconds
+      expiresIn: uploadConfig.uploadTimeoutSeconds,
     });
 
   } catch (error) {

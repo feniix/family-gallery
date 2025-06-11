@@ -57,7 +57,9 @@ export async function readJsonFile<T = any>(filename: string): Promise<T | null>
     
     const parsed = JSON.parse(bodyString) as T;
     if (parsed && typeof parsed === 'object' && 'media' in parsed) {
-      console.log(`[READ JSON] Parsed ${filename} with ${(parsed as any).media.length} media items`)
+      const media = (parsed as Record<string, unknown>).media;
+      const mediaCount = Array.isArray(media) ? media.length : 0;
+      console.log(`[READ JSON] Parsed ${filename} with ${mediaCount} media items`)
     }
     
     return parsed;
@@ -189,10 +191,19 @@ export async function withRetry<T>(
 /**
  * Specific database instances for the application
  */
-import type { UsersData, ConfigData, MediaYearData } from '@/types/media';
+import type { UsersData, ConfigData, MediaYearData, MediaIndex } from '@/types/media';
 
 export const usersDb = createJsonDb<UsersData>('users.json', { users: {} });
 export const configDb = createJsonDb<ConfigData>('config.json', { subjects: ['rufina', 'bernabe'], tags: [] });
+
+/**
+ * Media index to track which years have data
+ */
+export const mediaIndexDb = createJsonDb<MediaIndex>('media/index.json', { 
+  years: [], 
+  lastUpdated: new Date().toISOString(),
+  totalMedia: 0 
+});
 
 /**
  * Get media database for a specific year
@@ -201,6 +212,130 @@ export const configDb = createJsonDb<ConfigData>('config.json', { subjects: ['ru
  */
 export function getMediaDb(year: number) {
   return createJsonDb<MediaYearData>(`media/${year}.json`, { media: [] });
+}
+
+/**
+ * Add a year to the media index if not already present
+ */
+export async function addYearToIndex(year: number): Promise<void> {
+  await withRetry(() =>
+    mediaIndexDb.update((current) => {
+      if (!current.years.includes(year)) {
+        current.years.push(year);
+        current.years.sort((a, b) => b - a); // Sort descending (newest first)
+      }
+      current.lastUpdated = new Date().toISOString();
+      return current;
+    })
+  );
+}
+
+/**
+ * Remove a year from the media index if it has no media
+ */
+export async function removeYearFromIndex(year: number): Promise<void> {
+  await withRetry(() =>
+    mediaIndexDb.update((current) => {
+      current.years = current.years.filter(y => y !== year);
+      current.lastUpdated = new Date().toISOString();
+      return current;
+    })
+  );
+}
+
+/**
+ * Update total media count in index
+ */
+export async function updateIndexMediaCount(): Promise<void> {
+  const index = await withRetry(() => mediaIndexDb.read());
+  let totalMedia = 0;
+  
+  // Count media across all indexed years
+  for (const year of index.years) {
+    try {
+      const yearDb = getMediaDb(year);
+      const yearData = await withRetry(() => yearDb.read());
+      totalMedia += yearData.media.length;
+    } catch {
+      // Skip years that no longer exist
+    }
+  }
+  
+  await withRetry(() =>
+    mediaIndexDb.update((current) => {
+      current.totalMedia = totalMedia;
+      current.lastUpdated = new Date().toISOString();
+      return current;
+    })
+  );
+}
+
+/**
+ * Build media index from existing data - run once to migrate
+ * This scans all possible years and builds the index
+ */
+export async function buildMediaIndexFromExistingData(): Promise<{ yearsFound: number[], totalMedia: number }> {
+  console.log('[INDEX MIGRATION] Starting media index migration...');
+  
+  const yearsWithData: number[] = [];
+  let totalMedia = 0;
+  
+  // Check a reasonable range of years for existing data
+  const currentYear = new Date().getFullYear();
+  const startYear = 1970; // Before digital cameras, but covers scanned photos
+  const endYear = currentYear + 10; // Handle future dates or timezone issues
+  
+  console.log(`[INDEX MIGRATION] Scanning years ${startYear} to ${endYear}...`);
+  
+  // Check all years in parallel to find which ones have data
+  const yearPromises = [];
+  for (let year = startYear; year <= endYear; year++) {
+    yearPromises.push(
+      (async (checkYear: number) => {
+        try {
+          const mediaDb = getMediaDb(checkYear);
+          const mediaData = await withRetry(() => mediaDb.read());
+          if (mediaData.media && mediaData.media.length > 0) {
+            console.log(`[INDEX MIGRATION] Found ${mediaData.media.length} media items in year ${checkYear}`);
+            return { year: checkYear, count: mediaData.media.length };
+          }
+        } catch {
+          // Year has no data or doesn't exist
+        }
+        return null;
+      })(year)
+    );
+  }
+  
+  const results = await Promise.allSettled(yearPromises);
+  
+  // Collect years with data
+  results.forEach((result) => {
+    if (result.status === 'fulfilled' && result.value) {
+      yearsWithData.push(result.value.year);
+      totalMedia += result.value.count;
+    }
+  });
+  
+  // Sort years descending (newest first)
+  yearsWithData.sort((a, b) => b - a);
+  
+  console.log(`[INDEX MIGRATION] Found data in ${yearsWithData.length} years:`, yearsWithData);
+  console.log(`[INDEX MIGRATION] Total media items: ${totalMedia}`);
+  
+  // Update the index
+  await withRetry(() =>
+    mediaIndexDb.update((current) => {
+      current.years = yearsWithData;
+      current.totalMedia = totalMedia;
+      current.lastUpdated = new Date().toISOString();
+      return current;
+    })
+  );
+  
+  console.log('[INDEX MIGRATION] Media index migration completed');
+  
+  return { yearsFound: yearsWithData, totalMedia };
 }
 
 /**

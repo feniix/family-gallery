@@ -3,6 +3,7 @@ import { extractExifMetadata, isScreenshot, isEditedPhoto } from './exif';
 import { processDateWithFallbacks } from './date-handling';
 import { generateUniqueFilename } from './file-naming';
 import CryptoJS from 'crypto-js';
+import { isFileSizeValid, getFileSizeLimitDisplay } from '@/lib/config';
 
 /**
  * Process metadata for an uploaded file
@@ -188,9 +189,12 @@ export function validateMetadata(metadata: MediaMetadata): {
     errors.push('Invalid taken at date');
   }
   
-  // File size validation (max 50MB)
-  if (metadata.metadata?.size && metadata.metadata.size > 50 * 1024 * 1024) {
-    errors.push('File size exceeds 50MB limit');
+  // File size validation using type-specific limits
+  if (metadata.metadata?.size) {
+    const fileType = metadata.type === 'video' ? 'video/mp4' : 'image/jpeg'; // Use representative types
+    if (!isFileSizeValid(metadata.metadata.size, fileType)) {
+      errors.push(`File size exceeds ${getFileSizeLimitDisplay(fileType)} limit`);
+    }
   }
   
   // GPS validation if present

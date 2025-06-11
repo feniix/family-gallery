@@ -11,6 +11,8 @@ import { UploadProgress } from '@/components/admin/upload-progress'
 import { Upload, Image, Video, FileText, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { extractExifMetadata } from '@/lib/exif'
+import { getMaxPhotoSizeDisplay, getMaxVideoSizeDisplay } from '@/lib/config'
+import { uploadWithTransaction } from '@/lib/upload-transaction'
 import type { ExifMetadata, MediaMetadata } from '@/types/media'
 
 export interface UploadFile {
@@ -41,6 +43,7 @@ export default function AdminUploadPage() {
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false)
+  const [isMigratingIndex, setIsMigratingIndex] = useState(false)
 
   // Redirect if not admin
   if (isLoaded && !isAdmin) {
@@ -305,6 +308,22 @@ export default function AdminUploadPage() {
       // Update status to uploading
       updateFileStatus(uploadFile.id, 'uploading', 0)
 
+      // For video files, use the transaction-based upload system that handles thumbnail generation
+      if (uploadFile.file.type.startsWith('video/')) {
+        console.log(`Using transaction upload for video: ${uploadFile.file.name}`)
+        
+        updateFileStatus(uploadFile.id, 'processing', 20)
+        
+        const mediaMetadata = await uploadWithTransaction(uploadFile.file, {
+          userId: user?.id || 'unknown'
+        })
+        
+        console.log(`Video upload with thumbnail completed:`, mediaMetadata)
+        updateFileStatus(uploadFile.id, 'completed', 100)
+        return
+      }
+
+      // For photos, continue with the existing upload flow
       // Determine the best date to use for file organization
       let takenAt: string | undefined;
       if (uploadFile.exifData?.dateTimeOriginal) {
@@ -390,7 +409,7 @@ export default function AdminUploadPage() {
       
              // Create media metadata
        const mediaMetadata: MediaMetadata = {
-        id: crypto.randomUUID(),
+        id: require('crypto').randomBytes(16).toString('hex'),
         filename: uploadFile.file.name.replace(/[^a-zA-Z0-9.-]/g, '_'), // Sanitize filename
         originalFilename: uploadFile.file.name,
         path: filePath,
@@ -512,6 +531,34 @@ export default function AdminUploadPage() {
     }
   }
 
+  const handleMigrateIndex = async () => {
+    setIsMigratingIndex(true)
+    try {
+      console.log('[CLIENT] Starting media index migration...')
+      toast.info('Starting media index migration...')
+      
+      const response = await fetch('/api/admin/migrate-index', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }))
+        throw new Error(errorData.error || `Migration failed (${response.status})`)
+      }
+      
+      const result = await response.json()
+      console.log('[CLIENT] Migration completed:', result)
+      toast.success(`Index migration completed! Found ${result.totalMedia} media items in ${result.yearsFound.length} years.`)
+      
+    } catch (error) {
+      console.error('[CLIENT] Migration failed:', error)
+      toast.error(error instanceof Error ? error.message : 'Migration failed')
+    } finally {
+      setIsMigratingIndex(false)
+    }
+  }
+
   const handleTestFileExif = async () => {
     // Create a file input for testing
     const input = document.createElement('input')
@@ -571,6 +618,14 @@ export default function AdminUploadPage() {
           </div>
           <div className="flex space-x-2">
             <Button
+              onClick={handleMigrateIndex}
+              disabled={isMigratingIndex}
+              variant="outline"
+              size="sm"
+            >
+              {isMigratingIndex ? 'Migrating...' : 'Migrate Index'}
+            </Button>
+            <Button
               onClick={handleTestExifExtraction}
               variant="outline"
               size="sm"
@@ -589,80 +644,59 @@ export default function AdminUploadPage() {
       </div>
 
       {/* Upload Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
-        <Card className="p-4">
-          <div className="flex items-center space-x-2">
-            <FileText className="h-4 w-4 text-blue-500" />
-            <div>
-              <p className="text-sm text-muted-foreground">Total</p>
-              <p className="text-2xl font-bold">{stats.total}</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center space-x-2">
-            {/* eslint-disable-next-line jsx-a11y/alt-text */}
-            <Image className="h-4 w-4 text-green-500" />
-            <div>
-              <p className="text-sm text-muted-foreground">Images</p>
-              <p className="text-2xl font-bold">{stats.images}</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center space-x-2">
-            <Video className="h-4 w-4 text-purple-500" />
-            <div>
-              <p className="text-sm text-muted-foreground">Videos</p>
-              <p className="text-2xl font-bold">{stats.videos}</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="space-y-1">
-            <Badge variant="secondary">{stats.pending} Pending</Badge>
-            <Badge variant="outline">{stats.uploading} Uploading</Badge>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="space-y-1">
-            <Badge variant="outline">{stats.processing} Processing</Badge>
-            <Badge variant="default">{stats.completed} Completed</Badge>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <Badge variant="destructive">{stats.failed} Failed</Badge>
-        </Card>
-        {stats.duplicates > 0 && (
-          <Card className="p-4">
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">Duplicates</p>
-                <p className="text-2xl font-bold text-orange-600">{stats.duplicates}</p>
+      {uploadFiles.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Upload Statistics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
+                <div className="text-sm text-muted-foreground">Total</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
+                <div className="text-sm text-muted-foreground">Pending</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{stats.uploading}</div>
+                <div className="text-sm text-muted-foreground">Uploading</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">{stats.processing}</div>
+                <div className="text-sm text-muted-foreground">Processing</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
+                <div className="text-sm text-muted-foreground">Completed</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
+                <div className="text-sm text-muted-foreground">Failed</div>
               </div>
             </div>
-          </Card>
-        )}
-        <Card className="p-4">
-          <div className="space-y-2">
-            <Button 
-              onClick={handleStartUpload}
-              disabled={isUploading || (stats.pending + stats.duplicates) === 0}
-              size="sm"
-              className="w-full"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Upload ({stats.pending + stats.duplicates})
-            </Button>
-            {isCheckingDuplicates && (
-              <p className="text-xs text-muted-foreground text-center">
-                Checking for duplicates...
-              </p>
-            )}
-          </div>
+            
+            {/* Upload Action Button */}
+            <div className="mt-6 flex justify-center">
+              <Button 
+                onClick={handleStartUpload}
+                disabled={isUploading || (stats.pending + stats.duplicates) === 0}
+                size="lg"
+                className="px-8"
+              >
+                <Upload className="h-5 w-5 mr-2" />
+                Upload {stats.pending + stats.duplicates} Files
+              </Button>
+              {isCheckingDuplicates && (
+                <p className="text-sm text-muted-foreground text-center mt-2">
+                  Checking for duplicates...
+                </p>
+              )}
+            </div>
+          </CardContent>
         </Card>
-      </div>
+      )}
 
       {/* Duplicate Detection Warning */}
       {stats.duplicates > 0 && (
@@ -682,14 +716,13 @@ export default function AdminUploadPage() {
         </Card>
       )}
 
-      {/* Upload Zone */}
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Upload Files</CardTitle>
           <CardDescription>
             Drag and drop photos and videos here, or click to select files. 
             Duplicate detection will automatically check your files.
-            Supported formats: JPG, PNG, GIF, WebP, MP4, MOV, AVI (max 50MB each)
+            Supported formats: JPG, PNG, GIF, WebP, MP4, MOV, AVI (max {getMaxPhotoSizeDisplay()} for photos, {getMaxVideoSizeDisplay()} for videos)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -739,6 +772,26 @@ export default function AdminUploadPage() {
               onRemoveFile={handleRemoveFile}
               onForceUploadDuplicate={handleForceUploadDuplicate}
             />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Progress Summary */}
+      {isUploading && (
+        <Card className="mt-6">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">Overall Progress</span>
+              <span className="text-sm text-muted-foreground">
+                {stats.completed} of {stats.total} files completed
+              </span>
+            </div>
+            <div className="w-full bg-muted rounded-full h-2">
+              <div 
+                className="bg-primary h-2 rounded-full transition-all duration-300"
+                style={{ width: `${stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%` }}
+              />
+            </div>
           </CardContent>
         </Card>
       )}
