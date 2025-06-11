@@ -9,9 +9,15 @@ import { PhotoGridSkeleton } from '@/components/ui/image-skeleton';
 import { MediaMetadata } from '@/types/media';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
+import { 
+  PerformanceMonitor, 
+  MediaMemoryManager, 
+  getLoadingStrategy 
+} from '@/lib/performance';
 
 interface TimelineViewProps {
   onMediaUpdate?: (media: MediaMetadata[]) => void;
+  enablePerformanceOptimizations?: boolean;
 }
 
 interface GroupedMedia {
@@ -21,7 +27,10 @@ interface GroupedMedia {
   media: MediaMetadata[];
 }
 
-export function TimelineView({ onMediaUpdate }: TimelineViewProps) {
+export function TimelineView({ 
+  onMediaUpdate,
+  enablePerformanceOptimizations = true 
+}: TimelineViewProps) {
   const [media, setMedia] = useState<MediaMetadata[]>([]);
   const [groupedMedia, setGroupedMedia] = useState<GroupedMedia[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,57 +44,99 @@ export function TimelineView({ onMediaUpdate }: TimelineViewProps) {
   const offsetRef = useRef(0);
   const loadingRef = useRef(false);
   const initializedRef = useRef(false);
+  const performanceMonitor = useRef(enablePerformanceOptimizations ? PerformanceMonitor.getInstance() : null);
+  const memoryManager = useRef(enablePerformanceOptimizations ? MediaMemoryManager.getInstance() : null);
+
+  // Get loading strategy based on device performance
+  const loadingStrategy = enablePerformanceOptimizations ? getLoadingStrategy() : {
+    initialBatchSize: 50,
+    batchSize: 40,
+    preloadDistance: 200
+  };
 
   const { ref: loadMoreRef, inView } = useInView({
     threshold: 0.1,
-    rootMargin: '100px',
+    rootMargin: `${loadingStrategy.preloadDistance}px`,
   });
 
-  // Group media by year and month
+  // Group media by date
   const groupMediaByDate = (mediaList: MediaMetadata[]): GroupedMedia[] => {
-    const groups: { [key: string]: GroupedMedia } = {};
+    const startTime = enablePerformanceOptimizations ? performance.now() : 0;
     
-    mediaList.forEach((item) => {
+    const groups = new Map<string, MediaMetadata[]>();
+    
+    mediaList.forEach(item => {
+      let date: Date;
       try {
-        const date = parseISO(item.takenAt);
-        const year = date.getFullYear();
-        const month = date.getMonth();
-        const key = `${year}-${month}`;
-        
-        if (!groups[key]) {
-          groups[key] = {
-            year,
-            month,
-            displayDate: format(date, 'MMMM yyyy'),
-            media: []
-          };
+        date = new Date(item.takenAt);
+        if (isNaN(date.getTime())) {
+          throw new Error('Invalid date');
         }
-        
-        groups[key].media.push(item);
       } catch {
-        console.warn('Invalid date for media item:', item.id, item.takenAt);
-        // Handle items with invalid dates - group them in "Unknown Date"
-        const key = 'unknown';
-        if (!groups[key]) {
-          groups[key] = {
-            year: 0,
-            month: 0,
-            displayDate: 'Unknown Date',
-            media: []
-          };
-        }
-        groups[key].media.push(item);
+        date = new Date(item.uploadedAt);
       }
+      
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const key = `${year}-${month}`;
+      
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(item);
     });
+    
+    const result = Array.from(groups.entries())
+      .map(([key, items]) => {
+        const [yearStr, monthStr] = key.split('-');
+        const year = parseInt(yearStr);
+        const month = parseInt(monthStr);
+        const date = new Date(year, month, 1);
+        
+        return {
+          year,
+          month,
+          displayDate: format(date, 'MMMM yyyy'),
+          media: items.sort((a, b) => new Date(b.takenAt).getTime() - new Date(a.takenAt).getTime())
+        };
+      })
+      .sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year;
+        return b.month - a.month;
+      });
 
-    // Sort groups by year and month (newest first)
-    return Object.values(groups).sort((a, b) => {
-      if (a.year === 0) return 1; // Unknown dates go to the end
-      if (b.year === 0) return -1;
-      if (a.year !== b.year) return b.year - a.year;
-      return b.month - a.month;
-    });
+    if (enablePerformanceOptimizations && performanceMonitor.current) {
+      performanceMonitor.current.logPerformance('groupMediaByDate', startTime);
+    }
+
+    return result;
   };
+
+  // Memory management
+  useEffect(() => {
+    if (!enablePerformanceOptimizations || !performanceMonitor.current) return;
+
+    const checkMemory = () => {
+      const memoryCheck = performanceMonitor.current!.checkMemoryUsage();
+      if (memoryCheck.needsCleanup && memoryManager.current) {
+        console.warn('High memory usage detected, triggering cleanup');
+        memoryManager.current.clearCache();
+      }
+    };
+
+    const interval = setInterval(checkMemory, 30000); // Check every 30 seconds
+    return () => clearInterval(interval);
+  }, [enablePerformanceOptimizations]);
+
+  // Preload images for visible groups
+  useEffect(() => {
+    if (!enablePerformanceOptimizations || !memoryManager.current || groupedMedia.length === 0) return;
+
+    // Preload first 2 groups (most recent)
+    const priorityMedia = groupedMedia.slice(0, 2).flatMap(group => group.media);
+    const priorityIndexes = Array.from({ length: Math.min(16, priorityMedia.length) }, (_, i) => i);
+    memoryManager.current.preloadImages(priorityMedia, priorityIndexes);
+  }, [groupedMedia, enablePerformanceOptimizations]);
 
   // Initial load
   useEffect(() => {
@@ -97,8 +148,10 @@ export function TimelineView({ onMediaUpdate }: TimelineViewProps) {
       loadingRef.current = true;
       setLoading(true);
       
+      const startTime = enablePerformanceOptimizations ? performance.now() : 0;
+      
       try {
-        const response = await fetch('/api/media/all?limit=50&offset=0');
+        const response = await fetch(`/api/media/all?limit=${loadingStrategy.initialBatchSize}&offset=0`);
         if (!response.ok) throw new Error('Failed to load');
         
         const data = await response.json();
@@ -111,6 +164,10 @@ export function TimelineView({ onMediaUpdate }: TimelineViewProps) {
         setHasMore(data.pagination.hasMore);
         onMediaUpdate?.(newMedia);
         
+        if (enablePerformanceOptimizations && performanceMonitor.current) {
+          performanceMonitor.current.logPerformance('initialLoad', startTime);
+        }
+        
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error loading photos');
         toast.error('Failed to load photos');
@@ -121,7 +178,7 @@ export function TimelineView({ onMediaUpdate }: TimelineViewProps) {
     };
     
     loadInitial();
-  }, [onMediaUpdate]);
+  }, [onMediaUpdate, loadingStrategy.initialBatchSize, enablePerformanceOptimizations]);
 
   // Load more
   useEffect(() => {
@@ -131,8 +188,10 @@ export function TimelineView({ onMediaUpdate }: TimelineViewProps) {
       loadingRef.current = true;
       setLoadingMore(true);
       
+      const startTime = enablePerformanceOptimizations ? performance.now() : 0;
+      
       try {
-        const response = await fetch(`/api/media/all?limit=50&offset=${offsetRef.current}`);
+        const response = await fetch(`/api/media/all?limit=${loadingStrategy.batchSize}&offset=${offsetRef.current}`);
         if (!response.ok) throw new Error('Failed to load more');
         
         const data = await response.json();
@@ -150,6 +209,10 @@ export function TimelineView({ onMediaUpdate }: TimelineViewProps) {
         }
         setHasMore(data.pagination.hasMore);
         
+        if (enablePerformanceOptimizations && performanceMonitor.current) {
+          performanceMonitor.current.logPerformance('loadMore', startTime);
+        }
+        
       } catch {
         toast.error('Failed to load more photos');
       } finally {
@@ -159,7 +222,7 @@ export function TimelineView({ onMediaUpdate }: TimelineViewProps) {
     };
     
     loadMore();
-  }, [inView, hasMore, loading, loadingMore, onMediaUpdate]);
+  }, [inView, hasMore, loading, loadingMore, onMediaUpdate, loadingStrategy.batchSize, enablePerformanceOptimizations]);
 
   const handlePhotoClick = (clickedMedia: MediaMetadata, groupIndex: number, photoIndex: number) => {
     // Calculate global index across all groups
@@ -224,6 +287,17 @@ export function TimelineView({ onMediaUpdate }: TimelineViewProps) {
 
   return (
     <div className="space-y-8">
+      {/* Performance indicator for development */}
+      {process.env.NODE_ENV === 'development' && enablePerformanceOptimizations && memoryManager.current && (
+        <div className="text-xs text-muted-foreground">
+          Performance: ON | 
+          Items: {media.length} | 
+          Groups: {groupedMedia.length} | 
+          Cached: {memoryManager.current.getCacheStats().totalCached} | 
+          Batch: {loadingStrategy.batchSize}
+        </div>
+      )}
+
       {/* Timeline Groups */}
       {groupedMedia.map((group, groupIndex) => (
         <div key={`${group.year}-${group.month}`} className="space-y-4">
@@ -249,11 +323,11 @@ export function TimelineView({ onMediaUpdate }: TimelineViewProps) {
 
       {/* Loading States */}
       {loading && (
-        <PhotoGridSkeleton count={20} />
+        <PhotoGridSkeleton count={Math.min(20, loadingStrategy.initialBatchSize)} />
       )}
 
       {loadingMore && (
-        <PhotoGridSkeleton count={4} />
+        <PhotoGridSkeleton count={Math.min(4, loadingStrategy.batchSize)} />
       )}
 
       {/* Load More Trigger */}
@@ -275,17 +349,15 @@ export function TimelineView({ onMediaUpdate }: TimelineViewProps) {
       )}
 
       {/* Enhanced Lightbox */}
-      {lightboxOpen && selectedMedia && (
-        <EnhancedLightbox
-          media={selectedMedia}
-          allMedia={media}
-          currentIndex={selectedIndex}
-          isOpen={lightboxOpen}
-          onClose={handleLightboxClose}
-          onNext={handleLightboxNext}
-          onPrevious={handleLightboxPrev}
-        />
-      )}
+      <EnhancedLightbox
+        media={selectedMedia!}
+        allMedia={media}
+        currentIndex={selectedIndex}
+        isOpen={lightboxOpen}
+        onClose={handleLightboxClose}
+        onNext={handleLightboxNext}
+        onPrevious={handleLightboxPrev}
+      />
     </div>
   );
 } 

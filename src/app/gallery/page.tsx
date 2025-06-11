@@ -6,12 +6,22 @@ import { UserButton } from '@clerk/nextjs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { PhotoGrid } from '@/components/gallery/photo-grid'
+import { VirtualPhotoGrid } from '@/components/gallery/virtual-photo-grid'
 import { TimelineView } from '@/components/gallery/timeline-view'
 import { Lightbox } from '@/components/gallery/lightbox'
 import { SubjectFilter } from '@/components/gallery/subject-filter'
 import { SearchBar } from '@/components/gallery/search-bar'
 import { MediaMetadata } from '@/types/media'
-import { LayoutGrid, Clock, Filter } from 'lucide-react'
+import { LayoutGrid, Clock, Filter, Zap, ZapOff, Settings } from 'lucide-react'
+import { isLowPerformanceDevice } from '@/lib/performance'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export default function GalleryPage() {
   const { isLoaded, isSignedIn } = useUser();
@@ -26,6 +36,19 @@ export default function GalleryPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [searchResults, setSearchResults] = useState<MediaMetadata[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  
+  // Performance settings
+  const [performanceMode, setPerformanceMode] = useState<'auto' | 'performance' | 'quality'>('auto');
+  const [virtualScrollEnabled, setVirtualScrollEnabled] = useState(false);
+
+  // Auto-detect performance mode
+  useEffect(() => {
+    if (performanceMode === 'auto') {
+      setVirtualScrollEnabled(isLowPerformanceDevice());
+    } else {
+      setVirtualScrollEnabled(performanceMode === 'performance');
+    }
+  }, [performanceMode]);
 
   // Redirect to sign-in if not authenticated
   useEffect(() => {
@@ -48,7 +71,7 @@ export default function GalleryPage() {
     } else {
       loadFilteredMedia();
     }
-  }, [selectedSubjects, allMedia]); // loadFilteredMedia is stable
+  }, [selectedSubjects, allMedia]);
 
   const loadAvailableSubjects = async () => {
     try {
@@ -141,6 +164,28 @@ export default function GalleryPage() {
     setSelectedMedia(null);
   };
 
+  const getPerformanceIcon = () => {
+    switch (performanceMode) {
+      case 'performance':
+        return <Zap className="h-4 w-4" />;
+      case 'quality':
+        return <ZapOff className="h-4 w-4" />;
+      default:
+        return <Settings className="h-4 w-4" />;
+    }
+  };
+
+  const getPerformanceLabel = () => {
+    switch (performanceMode) {
+      case 'performance':
+        return 'Performance Mode';
+      case 'quality':
+        return 'Quality Mode';
+      default:
+        return `Auto Mode ${virtualScrollEnabled ? '(Performance)' : '(Quality)'}`;
+    }
+  };
+
   // Show loading state while checking authentication
   if (!isLoaded) {
     return (
@@ -161,64 +206,87 @@ export default function GalleryPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold">Family Gallery</h1>
-              <p className="text-sm text-muted-foreground">
-                Your family memories
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              {/* Filter Toggle */}
+      <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Family Gallery</h1>
+          
+          <div className="flex items-center gap-4">
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-2 border rounded-lg p-1">
               <Button
-                variant="outline"
+                variant={viewMode === 'timeline' ? 'default' : 'ghost'}
                 size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-                className={selectedSubjects.length > 0 ? 'bg-primary text-primary-foreground' : ''}
+                onClick={() => setViewMode('timeline')}
+                className="h-8 px-3"
               >
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
-                {selectedSubjects.length > 0 && (
-                  <Badge variant="secondary" className="ml-2 text-xs">
-                    {selectedSubjects.length}
-                  </Badge>
-                )}
+                <Clock className="h-4 w-4 mr-1" />
+                Timeline
               </Button>
-
-              {/* View Mode Toggle */}
-              <div className="flex items-center space-x-2 bg-muted rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode('timeline')}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    viewMode === 'timeline'
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <Clock className="h-4 w-4" />
-                  Timeline
-                </button>
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    viewMode === 'grid'
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                  Grid
-                </button>
-              </div>
-              <UserButton />
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className="h-8 px-3"
+              >
+                <LayoutGrid className="h-4 w-4 mr-1" />
+                Grid
+              </Button>
             </div>
+
+            {/* Filter Toggle */}
+            <Button
+              variant={showFilters ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className="h-8"
+            >
+              <Filter className="h-4 w-4 mr-1" />
+              Filters
+              {selectedSubjects.length > 0 && (
+                <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                  {selectedSubjects.length}
+                </Badge>
+              )}
+            </Button>
+
+            {/* Performance Settings */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8">
+                  {getPerformanceIcon()}
+                  <span className="ml-2 hidden sm:inline">{getPerformanceLabel()}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Performance Settings</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setPerformanceMode('auto')}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Auto Mode
+                  {performanceMode === 'auto' && <Badge className="ml-auto">Active</Badge>}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setPerformanceMode('performance')}>
+                  <Zap className="h-4 w-4 mr-2" />
+                  Performance Mode
+                  {performanceMode === 'performance' && <Badge className="ml-auto">Active</Badge>}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setPerformanceMode('quality')}>
+                  <ZapOff className="h-4 w-4 mr-2" />
+                  Quality Mode
+                  {performanceMode === 'quality' && <Badge className="ml-auto">Active</Badge>}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                  {virtualScrollEnabled ? 'Virtual scrolling enabled' : 'Standard scrolling'}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <UserButton afterSignOutUrl="/" />
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Gallery Content */}
       <div className="container mx-auto px-4 py-8">
         {/* Search Bar */}
         <div className="mb-6">
@@ -244,11 +312,21 @@ export default function GalleryPage() {
 
         {/* Gallery Views */}
         {viewMode === 'timeline' ? (
-          <TimelineView onMediaUpdate={handleMediaUpdate} />
+          <TimelineView 
+            onMediaUpdate={handleMediaUpdate}
+            enablePerformanceOptimizations={performanceMode !== 'quality'}
+          />
+        ) : virtualScrollEnabled ? (
+          <VirtualPhotoGrid 
+            onPhotoClick={handlePhotoClick}
+            onMediaUpdate={handleMediaUpdate}
+            enableVirtualScrolling={true}
+          />
         ) : (
           <PhotoGrid 
             onPhotoClick={handlePhotoClick}
             onMediaUpdate={handleMediaUpdate}
+            enablePerformanceOptimizations={performanceMode !== 'quality'}
           />
         )}
       </div>

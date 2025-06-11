@@ -6,13 +6,23 @@ import { PhotoCard } from './photo-card';
 import { PhotoGridSkeleton } from '@/components/ui/image-skeleton';
 import { MediaMetadata } from '@/types/media';
 import { toast } from 'sonner';
+import { 
+  PerformanceMonitor, 
+  MediaMemoryManager, 
+  getLoadingStrategy 
+} from '@/lib/performance';
 
 interface PhotoGridProps {
   onPhotoClick: (media: MediaMetadata, index: number) => void;
   onMediaUpdate?: (media: MediaMetadata[]) => void;
+  enablePerformanceOptimizations?: boolean;
 }
 
-export function PhotoGrid({ onPhotoClick, onMediaUpdate }: PhotoGridProps) {
+export function PhotoGrid({ 
+  onPhotoClick, 
+  onMediaUpdate, 
+  enablePerformanceOptimizations = true 
+}: PhotoGridProps) {
   const [media, setMedia] = useState<MediaMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -22,11 +32,44 @@ export function PhotoGrid({ onPhotoClick, onMediaUpdate }: PhotoGridProps) {
   const offsetRef = useRef(0);
   const loadingRef = useRef(false);
   const initializedRef = useRef(false);
+  const performanceMonitor = useRef(enablePerformanceOptimizations ? PerformanceMonitor.getInstance() : null);
+  const memoryManager = useRef(enablePerformanceOptimizations ? MediaMemoryManager.getInstance() : null);
+
+  // Get loading strategy based on device performance
+  const loadingStrategy = enablePerformanceOptimizations ? getLoadingStrategy() : {
+    initialBatchSize: 20,
+    batchSize: 16,
+    preloadDistance: 200
+  };
 
   const { ref: loadMoreRef, inView } = useInView({
     threshold: 0.1,
-    rootMargin: '100px',
+    rootMargin: `${loadingStrategy.preloadDistance}px`,
   });
+
+  // Memory management
+  useEffect(() => {
+    if (!enablePerformanceOptimizations || !performanceMonitor.current) return;
+
+    const checkMemory = () => {
+      const memoryCheck = performanceMonitor.current!.checkMemoryUsage();
+      if (memoryCheck.needsCleanup && memoryManager.current) {
+        console.warn('High memory usage detected, triggering cleanup');
+        memoryManager.current.clearCache();
+      }
+    };
+
+    const interval = setInterval(checkMemory, 30000); // Check every 30 seconds
+    return () => clearInterval(interval);
+  }, [enablePerformanceOptimizations]);
+
+  // Preload images for better performance
+  useEffect(() => {
+    if (!enablePerformanceOptimizations || !memoryManager.current || media.length === 0) return;
+
+    const priorityIndexes = Array.from({ length: Math.min(12, media.length) }, (_, i) => i);
+    memoryManager.current.preloadImages(media, priorityIndexes);
+  }, [media, enablePerformanceOptimizations]);
 
   // Initial load - only run once
   useEffect(() => {
@@ -38,8 +81,10 @@ export function PhotoGrid({ onPhotoClick, onMediaUpdate }: PhotoGridProps) {
       loadingRef.current = true;
       setLoading(true);
       
+      const startTime = enablePerformanceOptimizations ? performance.now() : 0;
+      
       try {
-        const response = await fetch('/api/media/all?limit=20&offset=0');
+        const response = await fetch(`/api/media/all?limit=${loadingStrategy.initialBatchSize}&offset=0`);
         if (!response.ok) throw new Error('Failed to load');
         
         const data = await response.json();
@@ -51,6 +96,10 @@ export function PhotoGrid({ onPhotoClick, onMediaUpdate }: PhotoGridProps) {
         setHasMore(data.pagination.hasMore);
         onMediaUpdate?.(newMedia);
         
+        if (enablePerformanceOptimizations && performanceMonitor.current) {
+          performanceMonitor.current.logPerformance('initialLoad', startTime);
+        }
+        
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error loading photos');
         toast.error('Failed to load photos');
@@ -61,7 +110,7 @@ export function PhotoGrid({ onPhotoClick, onMediaUpdate }: PhotoGridProps) {
     };
     
     loadInitial();
-  }, [onMediaUpdate]);
+  }, [onMediaUpdate, loadingStrategy.initialBatchSize, enablePerformanceOptimizations]);
 
   // Load more - separate effect for infinite scroll
   useEffect(() => {
@@ -71,8 +120,10 @@ export function PhotoGrid({ onPhotoClick, onMediaUpdate }: PhotoGridProps) {
       loadingRef.current = true;
       setLoadingMore(true);
       
+      const startTime = enablePerformanceOptimizations ? performance.now() : 0;
+      
       try {
-        const response = await fetch(`/api/media/all?limit=20&offset=${offsetRef.current}`);
+        const response = await fetch(`/api/media/all?limit=${loadingStrategy.batchSize}&offset=${offsetRef.current}`);
         if (!response.ok) throw new Error('Failed to load more');
         
         const data = await response.json();
@@ -89,6 +140,10 @@ export function PhotoGrid({ onPhotoClick, onMediaUpdate }: PhotoGridProps) {
         }
         setHasMore(data.pagination.hasMore);
         
+        if (enablePerformanceOptimizations && performanceMonitor.current) {
+          performanceMonitor.current.logPerformance('loadMore', startTime);
+        }
+        
       } catch {
         toast.error('Failed to load more photos');
       } finally {
@@ -98,7 +153,7 @@ export function PhotoGrid({ onPhotoClick, onMediaUpdate }: PhotoGridProps) {
     };
     
     loadMore();
-  }, [inView, hasMore, loading, loadingMore, onMediaUpdate]);
+  }, [inView, hasMore, loading, loadingMore, onMediaUpdate, loadingStrategy.batchSize, enablePerformanceOptimizations]);
 
   // Error state
   if (error && media.length === 0) {
@@ -129,6 +184,16 @@ export function PhotoGrid({ onPhotoClick, onMediaUpdate }: PhotoGridProps) {
 
   return (
     <div className="space-y-6">
+      {/* Performance indicator for development */}
+      {process.env.NODE_ENV === 'development' && enablePerformanceOptimizations && memoryManager.current && (
+        <div className="text-xs text-muted-foreground">
+          Performance: ON | 
+          Items: {media.length} | 
+          Cached: {memoryManager.current.getCacheStats().totalCached} | 
+          Batch: {loadingStrategy.batchSize}
+        </div>
+      )}
+
       {/* Photo Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {media.map((item, index) => (
@@ -143,11 +208,11 @@ export function PhotoGrid({ onPhotoClick, onMediaUpdate }: PhotoGridProps) {
 
       {/* Loading States */}
       {loading && (
-        <PhotoGridSkeleton count={20} />
+        <PhotoGridSkeleton count={loadingStrategy.initialBatchSize} />
       )}
 
       {loadingMore && (
-        <PhotoGridSkeleton count={4} />
+        <PhotoGridSkeleton count={Math.min(4, loadingStrategy.batchSize)} />
       )}
 
       {/* Load More Trigger */}
