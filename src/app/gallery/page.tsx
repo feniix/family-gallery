@@ -4,8 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs'
 import { UserButton } from '@clerk/nextjs'
 import { PhotoGrid } from '@/components/gallery/photo-grid'
+import { TimelineView } from '@/components/gallery/timeline-view'
 import { Lightbox } from '@/components/gallery/lightbox'
 import { MediaMetadata } from '@/types/media'
+import { LayoutGrid, Clock } from 'lucide-react'
 
 export default function GalleryPage() {
   const { isLoaded, isSignedIn } = useUser();
@@ -13,6 +15,7 @@ export default function GalleryPage() {
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [allMedia, setAllMedia] = useState<MediaMetadata[]>([]);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'timeline'>('timeline');
 
   // Redirect to sign-in if not authenticated
   useEffect(() => {
@@ -82,6 +85,31 @@ export default function GalleryPage() {
               </p>
             </div>
             <div className="flex items-center gap-4">
+              {/* View Mode Toggle */}
+              <div className="flex items-center space-x-2 bg-muted rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('timeline')}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'timeline'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Clock className="h-4 w-4" />
+                  Timeline
+                </button>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'grid'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  Grid
+                </button>
+              </div>
               <UserButton />
             </div>
           </div>
@@ -90,10 +118,14 @@ export default function GalleryPage() {
 
       {/* Gallery Content */}
       <div className="container mx-auto px-4 py-8">
-        <PhotoGrid 
-          onPhotoClick={handlePhotoClick}
-          onMediaUpdate={handleMediaUpdate}
-        />
+        {viewMode === 'timeline' ? (
+          <TimelineView onMediaUpdate={handleMediaUpdate} />
+        ) : (
+          <PhotoGrid 
+            onPhotoClick={handlePhotoClick}
+            onMediaUpdate={handleMediaUpdate}
+          />
+        )}
       </div>
 
       {/* Lightbox */}

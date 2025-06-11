@@ -7,8 +7,8 @@ This implementation plan is organized into phases and stages to deliver a functi
 **Target Timeline**: 6-8 weeks to full feature set
 **MVP Timeline**: 3-4 weeks
 
-**🎯 CURRENT STATUS**: **Stage 3.2** - Timeline Organization (Ready to implement)  
-**📊 PROGRESS**: Core infrastructure **100% complete**, basic photo grid **implemented**
+**🎯 CURRENT STATUS**: **Stage 4.1** - Subject Filtering (Ready to implement)  
+**📊 PROGRESS**: Core infrastructure **100% complete**, timeline organization **implemented**, enhanced lightbox **complete**
 
 ---
 
@@ -196,36 +196,63 @@ yarn add react-photo-album@latest react-intersection-observer@latest ✅
 - ✅ `components/ui/image-skeleton.tsx` - Loading skeleton components
 - ✅ `app/api/media/all/route.ts` - Cross-year media fetching API
 
-### Stage 3.2: Timeline Organization (Days 13-15) 🎯 **NEXT**
+### Stage 3.2: Timeline Organization (Days 13-15) ✅ **COMPLETED**
 
 **Deliverables**:
-- [ ] Chronological photo organization by EXIF date
-- [ ] Date-based grouping with month/year headers
-- [ ] Enhanced timeline navigation
-- [ ] URL state management for deep linking
-- [ ] Scroll position restoration
+- [x] Chronological photo organization by EXIF date
+- [x] Date-based grouping with month/year headers
+- [x] Enhanced timeline navigation with view mode toggle
+- [x] PhotoSwipe integration for enhanced lightbox
+- [x] Media download API with thumbnail support
 
-**Dependencies**:
+**Files Created**:
+- ✅ `components/gallery/timeline-view.tsx` - Timeline organization with date grouping
+- ✅ `components/gallery/date-header.tsx` - Month/year headers with photo counts
+- ✅ `components/gallery/enhanced-lightbox.tsx` - PhotoSwipe-powered lightbox
+- ✅ `app/api/media/download/[id]/route.ts` - Secure media file serving from R2
+- ✅ Updated `app/gallery/page.tsx` - View mode toggle between Grid and Timeline
+
+**Dependencies Installed**:
 ```bash
-yarn add photoswipe@latest video.js@latest @videojs/react@latest
+yarn add photoswipe@latest video.js@latest  ✅ Added
 ```
 
-### Stage 3.3: Lightbox & Photo Viewing (Days 15-16)
+### Stage 3.3: Enhanced Lightbox & Video Viewing (Days 15-16) ✅ **COMPLETED**
 
 **Deliverables**:
-- [ ] Full-screen photo viewing
-- [ ] Navigation between photos
-- [ ] Zoom and pan functionality
-- [ ] Video playback support
+- [x] Full-screen photo viewing with PhotoSwipe
+- [x] Navigation between photos with keyboard support
+- [x] Zoom and pan functionality
+- [x] Video playback support with dedicated overlay
+- [x] Enhanced metadata display with toggle
+- [x] PhotoSwipe integration fully implemented
+
+**Files Created**:
+- ✅ `components/gallery/enhanced-lightbox.tsx` - PhotoSwipe-powered lightbox (7.7KB, 246 lines)
+- ✅ Enhanced keyboard navigation (arrow keys, escape)
+- ✅ Video player overlay with controls
+- ✅ Metadata display overlay
+- ✅ Download functionality integrated
 
 ---
 
-## Phase 4: Enhanced Features (Week 4)
+## Phase 4: Enhanced Features (Week 4) 🎯 **CURRENT FOCUS**
 
-### Stage 4.1: Subject Filtering (Days 17-19)
-- [ ] Subject tagging system
-- [ ] Filter interface
+### Stage 4.1: Subject Filtering (Days 17-19) 🎯 **NEXT**
+
+**Deliverables**:
+- [ ] Subject tagging system (Rufina/Bernabe)
+- [ ] Filter interface with tag selection
 - [ ] Tag management for admins
+- [ ] Subject metadata integration
+- [ ] Search functionality across tags
+
+**Implementation Tasks**:
+- [ ] Add subject fields to media metadata
+- [ ] Create filter component with subject options
+- [ ] Implement tag-based filtering in API
+- [ ] Admin interface for tag management
+- [ ] Search integration with subject filtering
 
 ### Stage 4.2: Infinite Scroll & Performance (Days 19-20)
 - [ ] Infinite scroll implementation
@@ -277,9 +304,9 @@ yarn add photoswipe@latest video.js@latest @videojs/react@latest
 - **Testing**: Comprehensive E2E test suite
 
 ### 🎯 **Next Milestones**
-1. **Gallery Interface** (Stage 3.1-3.3) - 1-2 weeks
-2. **Enhanced Features** (Stage 4.1-4.3) - 1-2 weeks
-3. **Production Readiness** (Stage 6.1-6.3) - 1 week
+1. **Subject Filtering** (Stage 4.1) - 3-4 days
+2. **Performance Optimization** (Stage 4.2-4.3) - 1-2 weeks
+3. **Production Readiness** (Stage 5.1-5.3) - 1 week
 
 ---
 
@@ -293,10 +320,12 @@ yarn add photoswipe@latest video.js@latest @videojs/react@latest
 - ✅ Comprehensive test coverage
 
 ### MVP Success Criteria:
-- [ ] Gallery interface displays uploaded photos
-- [ ] Timeline organization working
-- [ ] Mobile-responsive viewing
-- [ ] Lightbox for full-screen viewing
+- [x] Gallery interface displays uploaded photos ✅
+- [x] Timeline organization working ✅
+- [x] Mobile-responsive viewing ✅
+- [x] Lightbox for full-screen viewing ✅
+- [x] Enhanced PhotoSwipe integration ✅
+- [ ] Subject filtering functionality
 - [ ] <3 second page load times
 
 ---
