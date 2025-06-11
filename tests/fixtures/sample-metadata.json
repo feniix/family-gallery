@@ -1,0 +1,118 @@
+{
+  "photo_example": {
+    "id": "photo_2023_12_25_IMG_001",
+    "filename": "IMG_20231225_142035.jpg",
+    "originalFilename": "IMG_20231225_142035.jpg",
+    "size": 2048576,
+    "mimeType": "image/jpeg",
+    "hash": "a1b2c3d4e5f6789012345678901234567890abcd",
+    "uploadedAt": "2024-01-15T10:30:00.000Z",
+    "uploadedBy": "admin@family.com",
+    "metadata": {
+      "width": 3024,
+      "height": 4032,
+      "dateTaken": "2023-12-25T14:20:35.000Z",
+      "camera": {
+        "make": "Apple",
+        "model": "iPhone 14 Pro",
+        "software": "16.7.2"
+      },
+      "location": {
+        "latitude": 37.7749,
+        "longitude": -122.4194,
+        "altitude": 52
+      },
+      "settings": {
+        "iso": 64,
+        "aperture": "f/1.78",
+        "shutterSpeed": "1/120",
+        "focalLength": "6.86mm"
+      }
+    },
+    "tags": ["family", "christmas", "2023"],
+    "isPublic": true,
+    "thumbnailUrl": "https://r2.family-gallery.com/thumbnails/photo_2023_12_25_IMG_001_thumb.jpg",
+    "fullUrl": "https://r2.family-gallery.com/media/photo_2023_12_25_IMG_001.jpg"
+  },
+  "video_example": {
+    "id": "video_2023_08_10_VID_001",
+    "filename": "VID_20230810_183042.mp4",
+    "originalFilename": "VID_20230810_183042.mp4",
+    "size": 15728640,
+    "mimeType": "video/mp4",
+    "hash": "9f8e7d6c5b4a39281726354849506172839405ab",
+    "uploadedAt": "2024-01-15T10:35:00.000Z",
+    "uploadedBy": "admin@family.com",
+    "metadata": {
+      "width": 1920,
+      "height": 1080,
+      "duration": 45.2,
+      "dateTaken": "2023-08-10T18:30:42.000Z",
+      "camera": {
+        "make": "Samsung",
+        "model": "Galaxy S23",
+        "software": "Android 13"
+      },
+      "location": {
+        "latitude": 34.0522,
+        "longitude": -118.2437,
+        "altitude": 71
+      },
+      "settings": {
+        "frameRate": 30,
+        "bitrate": "17.5 Mbps",
+        "codec": "H.264"
+      }
+    },
+    "tags": ["vacation", "summer", "2023"],
+    "isPublic": true,
+    "thumbnailUrl": "https://r2.family-gallery.com/thumbnails/video_2023_08_10_VID_001_thumb.jpg",
+    "fullUrl": "https://r2.family-gallery.com/media/video_2023_08_10_VID_001.mp4"
+  },
+  "whatsapp_photo_example": {
+    "id": "photo_2023_11_15_WA_001",
+    "filename": "IMG-20231115-WA0023.jpg",
+    "originalFilename": "IMG-20231115-WA0023.jpg",
+    "size": 524288,
+    "mimeType": "image/jpeg",
+    "hash": "5e4d3c2b1a09876543210fedcba098765432109f",
+    "uploadedAt": "2024-01-15T11:00:00.000Z",
+    "uploadedBy": "admin@family.com",
+    "metadata": {
+      "width": 1600,
+      "height": 1200,
+      "dateTaken": "2023-11-15T16:45:12.000Z",
+      "isWhatsAppMedia": true,
+      "compressedByWhatsApp": true,
+      "originalQuality": false
+    },
+    "tags": ["whatsapp", "shared", "2023"],
+    "isPublic": true,
+    "thumbnailUrl": "https://r2.family-gallery.com/thumbnails/photo_2023_11_15_WA_001_thumb.jpg",
+    "fullUrl": "https://r2.family-gallery.com/media/photo_2023_11_15_WA_001.jpg"
+  },
+  "duplicate_example": {
+    "id": "photo_2023_09_05_DUP_001",
+    "filename": "DSC_1234_copy.jpg",
+    "originalFilename": "DSC_1234 (2).jpg",
+    "size": 3145728,
+    "mimeType": "image/jpeg",
+    "hash": "a1b2c3d4e5f6789012345678901234567890abcd",
+    "uploadedAt": "2024-01-15T11:15:00.000Z",
+    "uploadedBy": "admin@family.com",
+    "isDuplicate": true,
+    "duplicateOf": "photo_2023_09_05_IMG_001",
+    "metadata": {
+      "width": 4000,
+      "height": 3000,
+      "dateTaken": "2023-09-05T14:22:18.000Z",
+      "camera": {
+        "make": "Nikon",
+        "model": "D750",
+        "software": "Ver.1.15"
+      }
+    },
+    "tags": ["duplicate", "2023"],
+    "isPublic": false
+  }
+} 

@@ -8,6 +8,8 @@
 
 This document outlines test cases for all features currently implemented in the Family Gallery application. These test cases can be used for manual testing and as a basis for automated Puppeteer tests to ensure no regressions occur as development continues.
 
+**🆕 AUTOMATED TESTING NOW AVAILABLE**: See [Automated Testing Guide](./automated-testing-guide.md) for comprehensive automated test coverage.
+
 ## Current Implementation Status
 
 - ✅ Authentication & Authorization (Clerk + Email-based admin)
@@ -17,6 +19,37 @@ This document outlines test cases for all features currently implemented in the 
 - ✅ JSON Database Storage (R2-based with atomic operations)
 - ✅ Video Support & Thumbnails (Stage 2.3 completed)
 - ✅ File Processing Pipeline (Metadata, thumbnails, database updates)
+- ✅ **Automated Testing Infrastructure** (Jest + Playwright)
+
+## 🤖 Automated Test Coverage
+
+The following test cases are now covered by automated tests:
+
+| Test Category | Manual Testing | Automated Coverage | Test Files |
+|---------------|----------------|-------------------|------------|
+| **Authentication** | ✅ Required | ✅ **E2E + Unit** | `tests/e2e/01-authentication.test.ts` |
+| **Upload System** | ✅ Required | ✅ **E2E + API + Unit** | `tests/e2e/02-upload-system.test.ts`, `tests/api/upload-endpoints.test.ts` |
+| **EXIF Processing** | ✅ Required | ✅ **Unit Tests** | `tests/lib/exif-processing.test.ts` |
+| **Duplicate Detection** | ✅ Required | ✅ **API + Unit** | `tests/api/upload-endpoints.test.ts`, `tests/lib/exif-processing.test.ts` |
+| **Database Operations** | ✅ Required | ✅ **API Tests** | `tests/api/upload-endpoints.test.ts` |
+| **Video Processing** | ✅ Required | ✅ **E2E + Unit** | `tests/e2e/02-upload-system.test.ts` |
+| **Error Handling** | ✅ Required | ✅ **All Types** | Multiple test files |
+| **Mobile UI** | ✅ Required | ✅ **E2E Tests** | `tests/e2e/02-upload-system.test.ts` |
+
+### Running Automated Tests
+
+```bash
+# Run all automated tests
+yarn test:all
+
+# Run specific test suites
+yarn test:e2e          # End-to-end tests
+yarn test:api          # API tests  
+yarn test              # Unit tests
+
+# Run with coverage
+yarn test:coverage
+```
 
 ---
 

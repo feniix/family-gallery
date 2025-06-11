@@ -77,7 +77,7 @@ yarn dev
 ```
 
 The application will be available at:
-- Local: http://localhost:3001 (or 3000 if available)
+- Local: http://localhost:8080
 - Network: http://192.168.x.x:3001
 
 ## Development Workflow
@@ -164,7 +164,7 @@ yarn next dev
 
 ### Port Conflicts
 
-**Problem**: Port 3000 is already in use
+**Problem**: Port 8080 is already in use
 
 **Solution**: Next.js automatically uses port 3001. You can also specify a port:
 

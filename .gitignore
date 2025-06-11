@@ -81,3 +81,10 @@ Thumbs.db
 # Future: Local image cache (when implemented)
 /cache/images/
 /.image-cache/
+
+# clerk configuration (can include secrets)
+/.clerk/
+
+cypress/screenshots/**
+!cypress/screenshots/.gitkeep
+

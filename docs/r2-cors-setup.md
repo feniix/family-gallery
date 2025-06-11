@@ -21,7 +21,7 @@ Configure CORS rules on your R2 bucket to allow uploads from your domain.
 [
   {
     "AllowedOrigins": [
-      "http://localhost:3000",
+      "http://localhost:8080",
       "http://localhost:3001", 
       "https://*.vercel.app",
       "https://your-domain.com"
@@ -55,7 +55,7 @@ cat > cors.json << EOF
   "CORSRules": [
     {
       "AllowedOrigins": [
-        "http://localhost:3000",
+        "http://localhost:8080",
         "http://localhost:3001",
         "https://*.vercel.app"
       ],
@@ -86,7 +86,7 @@ cat > cors.json << EOF
 [
   {
     "AllowedOrigins": [
-      "http://localhost:3000",
+      "http://localhost:8080",
       "http://localhost:3001",
       "https://*.vercel.app"
     ],
@@ -146,7 +146,7 @@ After applying CORS rules, you can verify they're working:
 2. **Test with curl**:
 ```bash
 curl -X OPTIONS \
-  -H "Origin: http://localhost:3000" \
+  -H "Origin: http://localhost:8080" \
   -H "Access-Control-Request-Method: PUT" \
   -H "Access-Control-Request-Headers: Content-Type" \
   https://your-bucket.r2.dev/test-file.jpg
@@ -158,7 +158,7 @@ curl -X OPTIONS \
 
 1. **AllowedOrigins**: Must include your exact domain (including protocol)
 2. **Wildcard subdomains**: Use `https://*.vercel.app` for Vercel preview deployments  
-3. **localhost ports**: Include both 3000 and 3001 for development
+3. **localhost ports**: Include both 8080 and 3001 for development
 4. **AllowedHeaders**: Use `["*"]` during development, restrict in production
 
 ### Error Messages:
