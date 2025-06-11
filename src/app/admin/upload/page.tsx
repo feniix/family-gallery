@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { UploadZone } from '@/components/admin/upload-zone'
 import { UploadProgress } from '@/components/admin/upload-progress'
+import { SubjectManagement } from '@/components/admin/subject-management'
 import { Upload, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { extractExifMetadata } from '@/lib/exif'
@@ -45,6 +46,7 @@ export default function AdminUploadPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false)
   const [isMigratingIndex, setIsMigratingIndex] = useState(false)
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([])
 
   // Define all callbacks and functions before any conditional returns
   const extractEXIFForImages = useCallback(async (uploadFiles: UploadFile[]) => {
@@ -436,7 +438,7 @@ export default function AdminUploadPage() {
           ...(uploadFile.exifData?.pixelXDimension && { width: uploadFile.exifData.pixelXDimension }),
           ...(uploadFile.exifData?.pixelYDimension && { height: uploadFile.exifData.pixelYDimension }),
         },
-        subjects: [], // Will be populated by admin during upload
+        subjects: selectedSubjects, // Use selected subjects from admin UI
         tags: [], // Will be populated by admin during upload
         // File processing flags
         isScreenshot: uploadFile.file.name.toLowerCase().includes('screenshot'),
@@ -652,6 +654,16 @@ export default function AdminUploadPage() {
         </div>
       </div>
 
+      {/* Subject Management */}
+      {uploadFiles.length > 0 && (
+        <div className="mb-6">
+          <SubjectManagement 
+            onSubjectsUpdate={(mediaId, subjects) => setSelectedSubjects(subjects)}
+            className="w-full"
+          />
+        </div>
+      )}
+
       {/* Upload Statistics */}
       {uploadFiles.length > 0 && (
         <Card className="mb-6">
@@ -696,6 +708,11 @@ export default function AdminUploadPage() {
               >
                 <Upload className="h-5 w-5 mr-2" />
                 Upload {stats.pending + stats.duplicates} Files
+                {selectedSubjects.length > 0 && (
+                  <span className="ml-2 text-xs bg-primary-foreground text-primary px-2 py-1 rounded">
+                    with {selectedSubjects.length} subject{selectedSubjects.length !== 1 ? 's' : ''}
+                  </span>
+                )}
               </Button>
               {isCheckingDuplicates && (
                 <p className="text-sm text-muted-foreground text-center mt-2">
