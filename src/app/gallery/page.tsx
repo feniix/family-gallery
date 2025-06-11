@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs'
 import { UserButton } from '@clerk/nextjs'
 import { Button } from '@/components/ui/button'
@@ -57,6 +57,31 @@ export default function GalleryPage() {
     }
   }, [isLoaded, isSignedIn]);
 
+  const loadAvailableSubjects = async () => {
+    try {
+      const response = await fetch('/api/media/subjects?action=list');
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableSubjects(data.subjects || []);
+      }
+    } catch (error) {
+      console.error('Error loading subjects:', error);
+    }
+  };
+
+  const loadFilteredMedia = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/media/subjects?action=filter&filter=${selectedSubjects.join(',')}`);
+      if (response.ok) {
+        const data = await response.json();
+        setFilteredMedia(data.media || []);
+      }
+    } catch (error) {
+      console.error('Error filtering media:', error);
+      setFilteredMedia([]);
+    }
+  }, [selectedSubjects]);
+
   // Load available subjects
   useEffect(() => {
     if (isSignedIn) {
@@ -71,32 +96,7 @@ export default function GalleryPage() {
     } else {
       loadFilteredMedia();
     }
-  }, [selectedSubjects, allMedia]);
-
-  const loadAvailableSubjects = async () => {
-    try {
-      const response = await fetch('/api/media/subjects?action=list');
-      if (response.ok) {
-        const data = await response.json();
-        setAvailableSubjects(data.subjects || []);
-      }
-    } catch (error) {
-      console.error('Error loading subjects:', error);
-    }
-  };
-
-  const loadFilteredMedia = async () => {
-    try {
-      const response = await fetch(`/api/media/subjects?action=filter&filter=${selectedSubjects.join(',')}`);
-      if (response.ok) {
-        const data = await response.json();
-        setFilteredMedia(data.media || []);
-      }
-    } catch (error) {
-      console.error('Error filtering media:', error);
-      setFilteredMedia([]);
-    }
-  };
+  }, [selectedSubjects, allMedia, loadFilteredMedia]);
 
   const handlePhotoClick = (media: MediaMetadata, index: number) => {
     setSelectedMedia(media);

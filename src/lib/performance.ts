@@ -35,7 +35,7 @@ export class PerformanceMonitor {
    */
   checkMemoryUsage(): { usage: number; needsCleanup: boolean } {
     if ('memory' in performance) {
-      const memoryInfo = (performance as any).memory;
+      const memoryInfo = (performance as unknown as { memory: { usedJSHeapSize: number } }).memory;
       const usedJSHeapSize = memoryInfo.usedJSHeapSize;
       
       return {
@@ -214,7 +214,7 @@ export class MediaMemoryManager {
     
     // Force garbage collection if available
     if ('gc' in window) {
-      (window as any).gc();
+      (window as unknown as { gc: () => void }).gc();
     }
   }
 
@@ -274,10 +274,10 @@ export function createOptimizedIntersectionObserver(
     ...options
   };
 
-  return new IntersectionObserver((entries) => {
+  return new IntersectionObserver((entries, observer) => {
     // Batch process entries for better performance
     requestAnimationFrame(() => {
-      callback(entries, arguments[1]);
+      callback(entries, observer);
     });
   }, defaultOptions);
 }
@@ -305,18 +305,20 @@ export function createResizeHandler(
  */
 export function isLowPerformanceDevice(): boolean {
   // Check various indicators of device performance
-  const connection = (navigator as any).connection;
+  const connection = (navigator as unknown as { connection?: { effectiveType: string } }).connection;
   const hardwareConcurrency = navigator.hardwareConcurrency || 1;
-  const deviceMemory = (navigator as any).deviceMemory || 1;
+  const deviceMemory = (navigator as unknown as { deviceMemory?: number }).deviceMemory || 1;
 
   // Consider device low-performance if:
   // - Less than 4 CPU cores
   // - Less than 2GB RAM
   // - Slow network connection
+  const hasSlowConnection = connection ? (connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g') : false;
+  
   return (
     hardwareConcurrency < 4 ||
     deviceMemory < 2 ||
-    (connection && (connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g'))
+    hasSlowConnection
   );
 }
 

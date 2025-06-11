@@ -19,10 +19,10 @@ export default function Home() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 Setup Status
-                <Badge variant="default">Stage 2.1</Badge>
+                <Badge variant="default">Stage 4.3</Badge>
               </CardTitle>
               <CardDescription>
-                Admin Upload Interface implemented
+                Admin Dashboard completed
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -74,8 +74,16 @@ export default function Home() {
                 <span className="text-sm">Upload interface</span>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline">Next</Badge>
-                <span className="text-sm">EXIF processing</span>
+                <Badge variant="default">✓</Badge>
+                <span className="text-sm">Gallery interface</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="default">✓</Badge>
+                <span className="text-sm">Subject filtering</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="default">✓</Badge>
+                <span className="text-sm">Admin dashboard</span>
               </div>
             </CardContent>
           </Card>
@@ -107,10 +115,10 @@ export default function Home() {
 
         <div className="mt-8 text-center">
           <p className="text-sm text-muted-foreground">
-            Stage 2.1 (Admin Upload Interface) completed successfully! 🎉
+            Stage 4.3 (Basic Admin Dashboard) completed successfully! 🎉
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Next: Stage 2.2 - EXIF Processing & Metadata
+            Next: Stage 5.1 - Production Readiness & Deployment
           </p>
         </div>
       </div>

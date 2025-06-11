@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useInView } from 'react-intersection-observer';
 import { PhotoCard } from './photo-card';
 import { DateHeader } from './date-header';
@@ -8,7 +8,7 @@ import { EnhancedLightbox } from './enhanced-lightbox';
 import { PhotoGridSkeleton } from '@/components/ui/image-skeleton';
 import { MediaMetadata } from '@/types/media';
 import { toast } from 'sonner';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { 
   PerformanceMonitor, 
   MediaMemoryManager, 
@@ -60,7 +60,7 @@ export function TimelineView({
   });
 
   // Group media by date
-  const groupMediaByDate = (mediaList: MediaMetadata[]): GroupedMedia[] => {
+  const groupMediaByDate = useCallback((mediaList: MediaMetadata[]): GroupedMedia[] => {
     const startTime = enablePerformanceOptimizations ? performance.now() : 0;
     
     const groups = new Map<string, MediaMetadata[]>();
@@ -110,7 +110,7 @@ export function TimelineView({
     }
 
     return result;
-  };
+  }, [enablePerformanceOptimizations, performanceMonitor]);
 
   // Memory management
   useEffect(() => {
@@ -178,7 +178,7 @@ export function TimelineView({
     };
     
     loadInitial();
-  }, [onMediaUpdate, loadingStrategy.initialBatchSize, enablePerformanceOptimizations]);
+  }, [onMediaUpdate, loadingStrategy.initialBatchSize, enablePerformanceOptimizations, groupMediaByDate]);
 
   // Load more
   useEffect(() => {
@@ -222,7 +222,7 @@ export function TimelineView({
     };
     
     loadMore();
-  }, [inView, hasMore, loading, loadingMore, onMediaUpdate, loadingStrategy.batchSize, enablePerformanceOptimizations]);
+  }, [inView, hasMore, loading, loadingMore, onMediaUpdate, loadingStrategy.batchSize, enablePerformanceOptimizations, groupMediaByDate]);
 
   const handlePhotoClick = (clickedMedia: MediaMetadata, groupIndex: number, photoIndex: number) => {
     // Calculate global index across all groups

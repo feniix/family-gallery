@@ -94,7 +94,7 @@ export function VirtualPhotoGrid({
 
   // Handle container resize
   useEffect(() => {
-    const handleResize = createResizeHandler((width) => {
+    const handleResize = createResizeHandler(() => {
       if (containerRef.current) {
         const containerWidth = containerRef.current.clientWidth;
         setGridDimensions(calculateGridDimensions(containerWidth));
@@ -138,7 +138,6 @@ export function VirtualPhotoGrid({
       };
     }
 
-    const rowHeight = gridDimensions.itemHeight + gridDimensions.gap;
     const totalRows = Math.ceil(media.length / gridDimensions.columns);
     const range = virtualScrollCalculator.current.calculateVisibleRange(scrollTop, totalRows);
 

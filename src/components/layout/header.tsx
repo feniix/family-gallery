@@ -6,7 +6,7 @@ import { SignInButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 import { useIsAdmin } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Upload, Images, Home } from 'lucide-react'
+import { Upload, Images, Home, BarChart3 } from 'lucide-react'
 
 export function Header() {
   const pathname = usePathname()
@@ -18,6 +18,7 @@ export function Header() {
   ]
 
   const adminNavigation = [
+    { name: 'Dashboard', href: '/admin/dashboard', icon: BarChart3 },
     { name: 'Upload', href: '/admin/upload', icon: Upload },
   ]
 
