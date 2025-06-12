@@ -25,7 +25,7 @@ import { TimelineView } from '@/components/gallery/timeline-view';
 import { PhotoGrid } from '@/components/gallery/photo-grid';
 import { VirtualPhotoGrid } from '@/components/gallery/virtual-photo-grid';
 import { SearchBar } from '@/components/gallery/search-bar';
-import { EnhancedLightbox } from '@/components/gallery/enhanced-lightbox';
+import { SimpleLightbox } from '@/components/gallery/simple-lightbox';
 import { MediaMetadata } from '@/types/media';
 import { isLowPerformanceDevice } from '@/lib/performance';
 
@@ -242,7 +242,7 @@ export default function GalleryPage() {
 
       {/* Enhanced Lightbox */}
       {selectedMedia && (
-        <EnhancedLightbox
+        <SimpleLightbox
           media={selectedMedia}
           allMedia={displayMedia}
           currentIndex={selectedIndex}

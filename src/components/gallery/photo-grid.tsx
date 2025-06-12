@@ -203,14 +203,16 @@ export function PhotoGrid({
       )}
 
       {/* Photo Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+      <div className="columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4 space-y-4">
         {media.map((item, index) => (
-          <PhotoCard
-            key={item.id}
-            media={item}
-            onClick={() => onPhotoClick(item, index)}
-            priority={index < 8} // Prioritize first 8 images
-          />
+          <div key={item.id} className="break-inside-avoid mb-4">
+            <PhotoCard
+              media={item}
+              onClick={() => onPhotoClick(item, index)}
+              priority={index < 8} // Prioritize first 8 images
+              aspectRatio="natural"
+            />
+          </div>
         ))}
       </div>
 

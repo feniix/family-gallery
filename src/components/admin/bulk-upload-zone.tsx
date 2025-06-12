@@ -398,8 +398,27 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
                 originalFilename: uploadFile.file.name
               });
               
-              const { generatePresignedUploadUrl } = await import('@/lib/r2');
-              const thumbnailPresignedUrl = await generatePresignedUploadUrl(fileNaming.thumbnailPath, 'image/jpeg');
+              // Get presigned URL for thumbnail using the API endpoint
+              const thumbnailPresignedResponse = await fetch('/api/upload/presigned', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  filename: `${fileNaming.thumbnailPath.split('/').pop()}`, // Just the filename
+                  contentType: 'image/jpeg',
+                  fileSize: uploadFile.imageThumbnail.size,
+                  customPath: fileNaming.thumbnailPath // Add custom path parameter
+                })
+              });
+
+              if (!thumbnailPresignedResponse.ok) {
+                console.warn('Failed to get thumbnail presigned URL:', {
+                  status: thumbnailPresignedResponse.status,
+                  statusText: thumbnailPresignedResponse.statusText
+                });
+                throw new Error(`Failed to get thumbnail presigned URL: ${thumbnailPresignedResponse.status}`);
+              }
+
+              const { presignedUrl: thumbnailPresignedUrl } = await thumbnailPresignedResponse.json();
               
               const thumbnailUploadResponse = await fetch(thumbnailPresignedUrl, {
                 method: 'PUT',

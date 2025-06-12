@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const { filename, contentType, fileSize, takenAt } = body;
+    const { filename, contentType, fileSize, takenAt, customPath } = body;
 
     // Validate required fields
     if (!filename || !contentType) {
@@ -54,15 +54,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate file path using EXIF date if available, otherwise current date
-    const uploadDate = takenAt ? new Date(takenAt) : new Date();
-    r2Logger.debug(`Generating presigned URL`, { 
-      filename, 
-      uploadDate: uploadDate.toISOString(), 
-      year: uploadDate.getFullYear(),
-      month: String(uploadDate.getMonth() + 1).padStart(2, '0')
-    });
-    const filePath = generateFilePath.original(uploadDate, filename);
+    // Generate file path
+    let filePath: string;
+    if (customPath) {
+      // Use the provided custom path (for thumbnails)
+      filePath = customPath;
+      r2Logger.debug(`Using custom path for presigned URL`, { 
+        filename, 
+        customPath 
+      });
+    } else {
+      // Generate path using EXIF date if available, otherwise current date
+      const uploadDate = takenAt ? new Date(takenAt) : new Date();
+      r2Logger.debug(`Generating presigned URL`, { 
+        filename, 
+        uploadDate: uploadDate.toISOString(), 
+        year: uploadDate.getFullYear(),
+        month: String(uploadDate.getMonth() + 1).padStart(2, '0')
+      });
+      filePath = generateFilePath.original(uploadDate, filename);
+    }
 
     // Generate presigned URL using configurable timeout
     const presignedUrl = await generatePresignedUploadUrl(

@@ -325,19 +325,20 @@ export function VirtualPhotoGrid({
         {/* Photo Grid */}
         <div 
           ref={gridRef}
-          className="grid gap-4"
+          className="columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4 space-y-4"
           style={{
-            gridTemplateColumns: `repeat(${gridDimensions.columns}, 1fr)`,
             padding: enableVirtualScrolling ? '16px' : '0'
           }}
         >
           {itemsToRender.map((item, index) => (
-            <PhotoCard
-              key={item.id}
-              media={item}
-              onClick={() => handlePhotoClick(item, index)}
-              priority={index < 8} // Prioritize first 8 images
-            />
+            <div key={item.id} className="break-inside-avoid mb-4">
+              <PhotoCard
+                media={item}
+                onClick={() => handlePhotoClick(item, index)}
+                priority={index < 8} // Prioritize first 8 images
+                aspectRatio="natural"
+              />
+            </div>
           ))}
         </div>
 

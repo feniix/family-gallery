@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useInView } from 'react-intersection-observer';
 import { PhotoCard } from './photo-card';
 import { DateHeader } from './date-header';
-import { EnhancedLightbox } from './enhanced-lightbox';
+import { SimpleLightbox } from './simple-lightbox';
 import { PhotoGridSkeleton } from '@/components/ui/image-skeleton';
 import { MediaMetadata } from '@/types/media';
 import { toast } from 'sonner';
@@ -202,13 +202,11 @@ export function TimelineView({
         
         const newMedia = data.media || [];
         if (newMedia.length > 0) {
-          setMedia(prev => {
-            const updated = [...prev, ...newMedia];
-            setGroupedMedia(groupMediaByDate(updated));
-            offsetRef.current = updated.length;
-            onMediaUpdate?.(updated);
-            return updated;
-          });
+          const updatedMedia = [...media, ...newMedia];
+          setMedia(updatedMedia);
+          setGroupedMedia(groupMediaByDate(updatedMedia));
+          offsetRef.current = updatedMedia.length;
+          onMediaUpdate?.(updatedMedia);
         }
         setHasMore(data.pagination.hasMore);
         
@@ -225,7 +223,7 @@ export function TimelineView({
     };
     
     loadMore();
-  }, [inView, hasMore, loading, loadingMore, onMediaUpdate, loadingStrategy.batchSize, enablePerformanceOptimizations, groupMediaByDate]);
+  }, [inView, hasMore, loading, loadingMore, media, onMediaUpdate, loadingStrategy.batchSize, enablePerformanceOptimizations, groupMediaByDate]);
 
   const handlePhotoClick = (clickedMedia: MediaMetadata, groupIndex: number, photoIndex: number) => {
     // Calculate global index across all groups
@@ -311,14 +309,16 @@ export function TimelineView({
             month={group.month}
           />
           
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div className="columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4 space-y-4">
             {group.media.map((item, photoIndex) => (
-              <PhotoCard
-                key={item.id}
-                media={item}
-                onClick={() => handlePhotoClick(item, groupIndex, photoIndex)}
-                priority={groupIndex === 0 && photoIndex < 8} // Prioritize first group's first 8 images
-              />
+              <div key={item.id} className="break-inside-avoid mb-4">
+                <PhotoCard
+                  media={item}
+                  onClick={() => handlePhotoClick(item, groupIndex, photoIndex)}
+                  priority={groupIndex === 0 && photoIndex < 8} // Prioritize first group's first 8 images
+                  aspectRatio="natural"
+                />
+              </div>
             ))}
           </div>
         </div>
@@ -352,7 +352,7 @@ export function TimelineView({
       )}
 
       {/* Enhanced Lightbox */}
-      <EnhancedLightbox
+      <SimpleLightbox
         media={selectedMedia!}
         allMedia={media}
         currentIndex={selectedIndex}

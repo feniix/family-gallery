@@ -11,9 +11,10 @@ interface PhotoCardProps {
   media: MediaMetadata;
   onClick: () => void;
   priority?: boolean;
+  aspectRatio?: 'square' | 'natural' | '4/3' | '3/2' | '16/9';
 }
 
-export function PhotoCard({ media, onClick, priority = false }: PhotoCardProps) {
+export function PhotoCard({ media, onClick, priority = false, aspectRatio = 'natural' }: PhotoCardProps) {
   // Use API endpoint for thumbnails to enable fallback to original image
   const imageUrl = media.thumbnailPath 
     ? `/api/media/download/${media.id}/thumbnail`
@@ -21,22 +22,83 @@ export function PhotoCard({ media, onClick, priority = false }: PhotoCardProps) 
   const isVideo = media.type === 'video';
   const hasVideoThumbnail = isVideo && media.thumbnailPath;
 
+  // Calculate aspect ratio class or style
+  const getAspectRatioConfig = () => {
+    if (aspectRatio === 'natural') {
+      if (media.metadata?.width && media.metadata?.height) {
+        // Use the actual aspect ratio from metadata
+        const ratio = media.metadata.width / media.metadata.height;
+        return {
+          useInlineStyle: true,
+          style: { aspectRatio: ratio.toString() }
+        };
+      } else {
+        // If natural is requested but no metadata, don't constrain aspect ratio
+        // Let the image determine its natural size within the container
+        return {
+          useInlineStyle: false,
+          className: '' // No aspect ratio constraint
+        };
+      }
+    }
+    
+    // Use predefined aspect ratio classes
+    const aspectClass = (() => {
+      switch (aspectRatio) {
+        case 'square':
+          return 'aspect-square';
+        case '4/3':
+          return 'aspect-[4/3]';
+        case '3/2':
+          return 'aspect-[3/2]';
+        case '16/9':
+          return 'aspect-[16/9]';
+        default:
+          return 'aspect-[4/3]';
+      }
+    })();
+    
+    return {
+      useInlineStyle: false,
+      className: aspectClass
+    };
+  };
+
+  const aspectConfig = getAspectRatioConfig();
+
   return (
     <div 
       className="group relative overflow-hidden rounded-lg bg-muted cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-lg"
       onClick={onClick}
     >
       {/* Image/Video Container */}
-      <div className="relative aspect-square">
+      <div 
+        className={`relative ${aspectConfig.useInlineStyle ? '' : aspectConfig.className}`}
+        style={aspectConfig.useInlineStyle ? aspectConfig.style : undefined}
+      >
         {hasVideoThumbnail || !isVideo ? (
-          <Image
-            src={imageUrl}
-            alt={media.originalFilename}
-            fill
-            className="object-cover transition-transform duration-200 group-hover:scale-110"
-            priority={priority}
-            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-          />
+          aspectConfig.className === '' ? (
+            // Natural aspect ratio without constraints
+            <Image
+              src={imageUrl}
+              alt={media.originalFilename}
+              width={media.metadata?.width || 800}
+              height={media.metadata?.height || 600}
+              className="w-full h-auto object-cover transition-transform duration-200 group-hover:scale-110"
+              priority={priority}
+              sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+            />
+          ) : (
+            // Constrained aspect ratio
+            <Image
+              src={imageUrl}
+              alt={media.originalFilename}
+              fill
+              className="object-cover transition-transform duration-200 group-hover:scale-110"
+              priority={priority}
+              sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+            />
+          )
         ) : (
           // Placeholder for videos without thumbnails
           <div className="w-full h-full bg-gray-200 flex items-center justify-center">
