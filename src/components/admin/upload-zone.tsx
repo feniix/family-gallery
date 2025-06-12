@@ -30,6 +30,11 @@ export function UploadZone({
       return true
     }
     
+    // Check for DNG files (may not have correct MIME type)
+    if (file.name.toLowerCase().endsWith('.dng')) {
+      return true
+    }
+    
     // For videos, use the video validation function
     if (file.type.startsWith('video/')) {
       const validation = validateVideoFile(file)
@@ -85,7 +90,7 @@ export function UploadZone({
     onDrop,
     disabled,
     accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp'],
+      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp', '.dng'],
       'video/*': ['.mp4', '.mov', '.avi', '.quicktime']
     },
     maxFiles,

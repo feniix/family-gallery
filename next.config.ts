@@ -17,6 +17,27 @@ const nextConfig: NextConfig = {
       fullUrl: false,
     },
   },
+  // Webpack configuration to handle AlaSQL dependencies
+  webpack: (config, { isServer }) => {
+    // Ignore React Native modules that AlaSQL tries to import
+    config.resolve = config.resolve || {};
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      'react-native-fs': false,
+      'react-native-fetch-blob': false,
+      'react-native': false,
+      'fs': false,
+      'path': false,
+    };
+
+    // Add externals for server-side builds
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push('react-native-fs', 'react-native-fetch-blob', 'react-native');
+    }
+
+    return config;
+  },
 };
 
 export default nextConfig;

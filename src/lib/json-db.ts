@@ -191,7 +191,7 @@ export async function withRetry<T>(
 /**
  * Specific database instances for the application
  */
-import type { UsersData, ConfigData, MediaYearData, MediaIndex } from '@/types/media';
+import type { UsersData, ConfigData, MediaYearData, MediaIndex, MediaMetadata } from '@/types/media';
 
 export const usersDb = createJsonDb<UsersData>('users.json', { users: {} });
 export const configDb = createJsonDb<ConfigData>('config.json', { subjects: ['rufina', 'bernabe'], tags: [] });
@@ -340,6 +340,29 @@ export async function buildMediaIndexFromExistingData(): Promise<{ yearsFound: n
   indexLogger.info('Media index migration completed');
   
   return { yearsFound: yearsWithData, totalMedia };
+}
+
+/**
+ * Get all media across all years
+ * @returns Array of all media items from all indexed years
+ */
+export async function getAllMediaAcrossYears(): Promise<MediaMetadata[]> {
+  const index = await withRetry(() => mediaIndexDb.read());
+  const allMedia: MediaMetadata[] = [];
+  
+  // Get media from all indexed years
+  for (const year of index.years) {
+    try {
+      const yearDb = getMediaDb(year);
+      const yearData = await withRetry(() => yearDb.read());
+      allMedia.push(...yearData.media);
+    } catch (error) {
+      indexLogger.warn(`Failed to load media for year ${year}`, { error });
+      // Continue with other years
+    }
+  }
+  
+  return allMedia;
 }
 
 /**

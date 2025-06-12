@@ -159,7 +159,7 @@ export const generateFilePath = {
  * Utility to validate file types
  */
 export const isValidFileType = (filename: string, type: 'image' | 'video' | 'any' = 'any'): boolean => {
-  const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif'];
+  const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.dng'];
   const videoTypes = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'];
   
   const extension = filename.toLowerCase().substring(filename.lastIndexOf('.'));

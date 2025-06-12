@@ -85,7 +85,7 @@ function sanitizeFilename(filename: string): string {
  */
 function generateThumbnailPath(originalPath: string, extension: string): string | undefined {
   // Only generate thumbnail paths for supported image formats
-  const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+  const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'dng'];
   const videoExtensions = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
   
   if (imageExtensions.includes(extension) || videoExtensions.includes(extension)) {

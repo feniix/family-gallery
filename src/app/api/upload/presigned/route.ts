@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
+import { randomUUID } from 'crypto';
 import { generatePresignedUploadUrl, isValidFileType, generateFilePath } from '@/lib/r2';
 import { uploadConfig, isFileSizeValid, getFileSizeLimitDisplay } from '@/lib/config';
 import { r2Logger } from '@/lib/logger';
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Create upload job ID for tracking
-    const jobId = crypto.randomUUID();
+    const jobId = randomUUID();
 
     return NextResponse.json({
       success: true,

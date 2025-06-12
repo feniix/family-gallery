@@ -239,6 +239,7 @@ export default function AdminDashboardPage() {
                     <div key={upload.id} className="flex items-center space-x-4">
                       <div className="flex-shrink-0">
                         {upload.type === 'photo' ? (
+                          // eslint-disable-next-line jsx-a11y/alt-text
                           <Image className="h-4 w-4 text-green-500" />
                         ) : (
                           <Video className="h-4 w-4 text-purple-500" />
@@ -330,6 +331,7 @@ export default function AdminDashboardPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
+                      {/* eslint-disable-next-line jsx-a11y/alt-text */}
                       <Image className="h-4 w-4 text-green-500" />
                       <span>Photos</span>
                     </div>
@@ -371,9 +373,10 @@ export default function AdminDashboardPage() {
                 {stats.media.recentUploads.map((upload) => (
                   <div key={upload.id} className="flex items-center justify-between p-3 border rounded">
                     <div className="flex items-center space-x-3">
-                      {upload.type === 'photo' ? (
-                        <Image className="h-5 w-5 text-green-500" />
-                      ) : (
+                                              {upload.type === 'photo' ? (
+                          // eslint-disable-next-line jsx-a11y/alt-text
+                          <Image className="h-5 w-5 text-green-500" />
+                        ) : (
                         <Video className="h-5 w-5 text-purple-500" />
                       )}
                       <div>

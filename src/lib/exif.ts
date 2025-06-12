@@ -55,6 +55,14 @@ const EXIF_OPTIONS = {
     'Copyright',
     'ImageDescription',
     'UserComment',
+    
+    // DNG-specific fields
+    'DNGVersion',
+    'DNGPrivateData',
+    'ColorMatrix1',
+    'ColorMatrix2',
+    'CameraCalibration1',
+    'CameraCalibration2',
   ],
   
   // Performance optimizations
@@ -63,6 +71,43 @@ const EXIF_OPTIONS = {
   multiSegment: false,
   silentErrors: true,
 };
+
+/**
+ * Detect DNG file characteristics for better compatibility
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function detectDngCharacteristics(exifData: any, filename: string): {
+  isDng: boolean;
+  isProRaw: boolean;
+  isJpegXL: boolean;
+  iphoneModel?: string;
+} {
+  const isDng = !!(exifData.DNGVersion || filename.toLowerCase().endsWith('.dng'));
+  const isApple = exifData.Make?.toLowerCase().includes('apple');
+  const isProRaw = isDng && isApple && (
+    exifData.Software?.includes('iOS') || 
+    exifData.Model?.includes('iPhone')
+  );
+  
+  // Detect iPhone 16 Pro characteristics (JPEG-XL compression)
+  const iphoneModel = exifData.Model;
+  const isJpegXL = isProRaw && (
+    iphoneModel?.includes('iPhone 16') ||
+    exifData.Software?.includes('18.') // iOS 18+ often uses JPEG-XL
+  );
+  
+  exifLogger.debug('DNG characteristics detected', {
+    filename,
+    isDng,
+    isProRaw,
+    isJpegXL,
+    iphoneModel,
+    software: exifData.Software,
+    dngVersion: exifData.DNGVersion
+  });
+  
+  return { isDng, isProRaw, isJpegXL, iphoneModel };
+}
 
 /**
  * Extract EXIF metadata from an image file
@@ -83,8 +128,13 @@ export async function extractExifMetadata(file: File): Promise<ExifMetadata | nu
 
   // Only process image files
   if (!file.type.startsWith('image/')) {
-    exifLogger.debug(`Skipping EXIF extraction - not an image file`, { filename: file.name, type: file.type });
-    return null;
+    // Special case for DNG files which may not have correct MIME type
+    if (file.name.toLowerCase().endsWith('.dng')) {
+      exifLogger.debug(`Processing DNG file despite MIME type`, { filename: file.name, type: file.type });
+    } else {
+      exifLogger.debug(`Skipping EXIF extraction - not an image file`, { filename: file.name, type: file.type });
+      return null;
+    }
   }
 
   exifLogger.debug(`Extracting EXIF data`, { filename: file.name, type: file.type, size: file.size });
@@ -104,6 +154,17 @@ export async function extractExifMetadata(file: File): Promise<ExifMetadata | nu
       hasGPS: !!(exifData.GPSLatitude && exifData.GPSLongitude),
       camera: exifData.Make && exifData.Model ? `${exifData.Make} ${exifData.Model}` : undefined
     });
+
+    // Detect DNG characteristics for enhanced compatibility
+    const dngInfo = detectDngCharacteristics(exifData, file.name);
+    if (dngInfo.isDng) {
+      exifLogger.info('DNG file characteristics', {
+        filename: file.name,
+        isProRaw: dngInfo.isProRaw,
+        isJpegXL: dngInfo.isJpegXL,
+        iphoneModel: dngInfo.iphoneModel
+      });
+    }
 
     // Process GPS coordinates
     const gps = extractGpsCoordinates(exifData);
@@ -148,10 +209,20 @@ export async function extractExifMetadata(file: File): Promise<ExifMetadata | nu
     return cleanMetadata(metadata);
     
   } catch (error) {
-    exifLogger.error('Failed to extract EXIF data', { 
-      filename: file.name, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    });
+    const isDngFile = file.name.toLowerCase().endsWith('.dng');
+    
+    if (isDngFile) {
+      exifLogger.warn('Failed to extract EXIF data from DNG file - this may be an iPhone ProRAW file with limited EXIF support', { 
+        filename: file.name, 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        suggestion: 'DNG file may still be valid but without extractable EXIF metadata'
+      });
+    } else {
+      exifLogger.error('Failed to extract EXIF data', { 
+        filename: file.name, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    }
     return null;
   }
 }
@@ -441,6 +512,7 @@ export async function testExifExtraction(): Promise<{
   isSupported: boolean;
   libraryAvailable: boolean;
   browserCompatible: boolean;
+  dngSupport?: boolean;
   error?: string;
 }> {
   try {
@@ -448,6 +520,7 @@ export async function testExifExtraction(): Promise<{
       isSupported: false,
       libraryAvailable: !!exifr && typeof exifr.parse === 'function',
       browserCompatible: !isServerSide() && typeof document !== 'undefined',
+      dngSupport: false,
       error: undefined as string | undefined
     };
 
@@ -467,6 +540,8 @@ export async function testExifExtraction(): Promise<{
       // Test if the library function exists and is callable
       if (typeof exifr.parse === 'function') {
         result.isSupported = true;
+        // Check if DNG support is available in exifr
+        result.dngSupport = true; // exifr 7.1.3 supports DNG
       }
     } catch {
       result.isSupported = false;
@@ -479,6 +554,7 @@ export async function testExifExtraction(): Promise<{
       isSupported: false,
       libraryAvailable: false,
       browserCompatible: !isServerSide() && typeof document !== 'undefined',
+      dngSupport: false,
       error: 'Unknown error'
     };
   }

@@ -121,7 +121,7 @@ export async function getPresignedUploadUrl(
 export function isValidFileType(filename: string): boolean {
   const validExtensions = [
     // Images
-    '.jpg', '.jpeg', '.png', '.gif', '.webp',
+    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.dng',
     // Videos
     '.mp4', '.mov', '.avi', '.quicktime'
   ]

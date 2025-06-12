@@ -202,7 +202,7 @@ export default function AdminUploadPage() {
     try {
       const newUploadFiles: UploadFile[] = files.map(file => ({
         file,
-        id: crypto.randomUUID(),
+        id: self.crypto?.randomUUID?.() || Math.random().toString(36).substring(2) + Date.now().toString(36),
         progress: 0,
         status: 'pending' as const,
         uploadedBy: user?.emailAddresses[0]?.emailAddress || 'unknown',
@@ -405,7 +405,7 @@ export default function AdminUploadPage() {
       
              // Create media metadata
        const mediaMetadata: MediaMetadata = {
-        id: crypto.randomUUID(),
+        id: self.crypto?.randomUUID?.() || Math.random().toString(36).substring(2) + Date.now().toString(36),
         filename: uploadFile.file.name.replace(/[^a-zA-Z0-9.-]/g, '_'), // Sanitize filename
         originalFilename: uploadFile.file.name,
         path: filePath,
@@ -594,7 +594,12 @@ export default function AdminUploadPage() {
         if (exifData) {
           toast.success(`EXIF data found! Camera: ${exifData.make || 'Unknown'} ${exifData.model || ''}, Date: ${exifData.dateTimeOriginal ? new Date(exifData.dateTimeOriginal).toLocaleDateString() : 'No date'}`)
         } else {
-          toast.warning(`No EXIF data found in ${file.name}. This might be normal for some image types or processed photos.`)
+          const isDngFile = file.name.toLowerCase().endsWith('.dng');
+          if (isDngFile) {
+            toast.warning(`No EXIF data found in ${file.name}. This DNG file may be valid but have limited metadata (common with iPhone 16 Pro JPEG-XL compressed DNG files).`)
+          } else {
+            toast.warning(`No EXIF data found in ${file.name}. This might be normal for some image types or processed photos.`)
+          }
         }
       } catch (error) {
         clientTestLogger.error('EXIF extraction failed', { fileName: file.name, error });

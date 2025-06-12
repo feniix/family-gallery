@@ -28,7 +28,7 @@ export const uploadConfig = {
   },
   
   // Supported file types
-  supportedImageTypes: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.tif'],
+  supportedImageTypes: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.tif', '.dng'],
   supportedVideoTypes: ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'],
   
   // Upload timeout in seconds
