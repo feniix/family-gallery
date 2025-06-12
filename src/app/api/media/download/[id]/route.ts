@@ -29,24 +29,47 @@ export async function GET(
     const url = new URL(request.url);
     const isThumbnail = url.pathname.endsWith('/thumbnail') || url.searchParams.has('thumbnail');
 
-    // Find the media in our database
+    // Find the media in our database using the media index
     let mediaItem = null;
-    const currentYear = new Date().getFullYear();
     
-    // Search through years to find the media item
-    for (let year = currentYear + 1; year >= currentYear - 10; year--) {
-      try {
-        const mediaDb = getMediaDb(year);
-        const mediaData = await withRetry(() => mediaDb.read());
-        
-        const found = mediaData.media?.find(item => item.id === id);
-        if (found) {
-          mediaItem = found;
-          break;
+    try {
+      // First, get the media index to know which years have data
+      const { mediaIndexDb } = await import('@/lib/json-db');
+      const index = await withRetry(() => mediaIndexDb.read());
+      
+      // Search only through years that actually have data
+      for (const year of index.years) {
+        try {
+          const mediaDb = getMediaDb(year);
+          const mediaData = await withRetry(() => mediaDb.read());
+          
+          const found = mediaData.media?.find(item => item.id === id);
+          if (found) {
+            mediaItem = found;
+            break;
+          }
+        } catch {
+          // Continue searching other years
+          continue;
         }
-             } catch {
-         // Continue searching other years
-         continue;
+      }
+    } catch {
+      // Fallback: search recent years if index is not available
+      const currentYear = new Date().getFullYear();
+      for (let year = currentYear; year >= currentYear - 5; year--) {
+        try {
+          const mediaDb = getMediaDb(year);
+          const mediaData = await withRetry(() => mediaDb.read());
+          
+          const found = mediaData.media?.find(item => item.id === id);
+          if (found) {
+            mediaItem = found;
+            break;
+          }
+        } catch {
+          // Continue searching other years
+          continue;
+        }
       }
     }
 

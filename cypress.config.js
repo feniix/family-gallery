@@ -11,7 +11,7 @@ module.exports = defineConfig({
     pageLoadTimeout: 30000,
     video: false,
     screenshotOnRunFailure: true,
-    supportFile: 'cypress/support/e2e.ts',
+    supportFile: false,
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
     env: {
       // Test user credentials from environment variables
