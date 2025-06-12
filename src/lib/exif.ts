@@ -440,36 +440,22 @@ function cleanMetadata(metadata: ExifMetadata): ExifMetadata {
   return cleaned;
 }
 
+// Import base functions from shared utilities
+import { isScreenshot as isScreenshotBase, isEditedPhoto as isEditedPhotoBase } from './utils/filename-patterns';
+
 /**
  * Check if a filename suggests it's a screenshot
  */
 export function isScreenshot(filename: string): boolean {
-  const screenshotPatterns = [
-    /screenshot/i,
-    /screen.?shot/i,
-    /capture/i,
-    /^img_\d{8}_\d{6}$/i, // WhatsApp screenshot pattern
-    /^screenshot_\d/i,
-    /^screen\d/i,
-  ];
-  
-  return screenshotPatterns.some(pattern => pattern.test(filename));
+  return isScreenshotBase(filename);
 }
 
 /**
- * Check if a filename suggests it's an edited photo
+ * Check if a filename suggests it's an edited photo (enhanced with EXIF data)
  */
 export function isEditedPhoto(filename: string, exifData?: ExifMetadata): boolean {
-  const editedPatterns = [
-    /edited/i,
-    /_edit/i,
-    /_modified/i,
-    /copy/i,
-    /duplicate/i,
-    /_\d+$/i, // Files ending with _1, _2, etc.
-  ];
-  
-  const filenameEdited = editedPatterns.some(pattern => pattern.test(filename));
+  // Check filename patterns first
+  const filenameEdited = isEditedPhotoBase(filename);
   
   // Check software used for editing
   const editingSoftware = [

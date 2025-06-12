@@ -1,5 +1,7 @@
 /// <reference types="node" />
 
+import { validateRequiredEnvVars } from './utils/error-handling';
+
 /**
  * Application configuration
  * 
@@ -186,9 +188,9 @@ export const clientConfig = {
     isProduction: process.env.NODE_ENV === 'production',
     isDevelopment: process.env.NODE_ENV === 'development',
   },
-}
-
-// Validate required environment variables (server-side only)
+  }
+  
+  // Validate required environment variables (server-side only)
 const requiredEnvVars = [
   'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
   'CLERK_SECRET_KEY',
@@ -198,7 +200,19 @@ const requiredEnvVars = [
   'R2_BUCKET_NAME',
   'R2_PUBLIC_URL',
   'ADMIN_EMAILS',
-]
+];
+
+// Perform validation on server startup
+if (typeof window === 'undefined') {
+  try {
+    validateRequiredEnvVars(requiredEnvVars);
+  } catch (error) {
+    console.error('Configuration validation failed:', error);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    }
+  }
+}
 
 if (typeof window === 'undefined' && config.env.isProduction) {
   for (const envVar of requiredEnvVars) {

@@ -2,6 +2,7 @@ import { MediaMetadata, DuplicateCheckResult } from '@/types/media';
 import { readJsonFile } from './json-db';
 import { getMetadataJsonPath } from './file-naming';
 import { dbLogger, duplicateLogger } from './logger';
+import { maskHash } from './utils/hash-generation';
 
 /**
  * Check if a file is a duplicate based on its hash
@@ -13,7 +14,7 @@ export async function checkForDuplicate(
 ): Promise<DuplicateCheckResult> {
   try {
     dbLogger.debug('Checking for duplicate hash', { 
-      hashPrefix: hash.substring(0, 16),
+      hashPrefix: maskHash(hash),
       uploadDate: uploadDate.toISOString()
     });
     
@@ -26,7 +27,7 @@ export async function checkForDuplicate(
     if (currentYearResult.isDuplicate) {
       dbLogger.info('Duplicate found in current year', { 
         currentYear,
-        hashPrefix: hash.substring(0, 16)
+        hashPrefix: maskHash(hash)
       });
       return currentYearResult;
     }
@@ -44,19 +45,19 @@ export async function checkForDuplicate(
       if (yearResult.isDuplicate) {
         dbLogger.info('Duplicate found in adjacent year', { 
           year,
-          hashPrefix: hash.substring(0, 16)
+          hashPrefix: maskHash(hash)
         });
         return yearResult;
       }
     }
     
-    dbLogger.debug('No duplicates found', { hashPrefix: hash.substring(0, 16) });
+    dbLogger.debug('No duplicates found', { hashPrefix: maskHash(hash) });
     return { isDuplicate: false, hash };
     
   } catch (error) {
     dbLogger.error('Error checking for duplicates', { 
       error: error instanceof Error ? error.message : error,
-      hashPrefix: hash.substring(0, 16)
+      hashPrefix: maskHash(hash)
     });
     // In case of error, assume not duplicate to allow upload
     return { isDuplicate: false, hash };
@@ -67,26 +68,26 @@ export async function checkForDuplicate(
  * Check for duplicates within a specific year
  */
 async function checkYearForDuplicate(hash: string, year: number): Promise<DuplicateCheckResult> {
-  duplicateLogger.debug(`Checking year for duplicates`, { year, hash: hash.substring(0, 16) + '...', uploadDate: new Date(year, 0, 1).toISOString() });
+  duplicateLogger.debug('Checking year for duplicates', { year, hash: maskHash(hash), uploadDate: new Date(year, 0, 1).toISOString() });
   
   try {
     const jsonPath = getMetadataJsonPath(new Date(year, 0, 1));
-    duplicateLogger.debug(`Looking for file`, { year, jsonPath });
+    duplicateLogger.debug('Looking for metadata file', { year, jsonPath });
     
     const yearData = await readJsonFile(jsonPath);
     if (!yearData || !yearData.media || yearData.media.length === 0) {
-      duplicateLogger.debug(`No data found for year`, { year, reason: 'file_not_exist_or_empty' });
+      duplicateLogger.debug('No data found for year', { year, reason: 'file_not_exist_or_empty' });
       return { isDuplicate: false, hash };
     }
 
-    duplicateLogger.info(`Found media items in year database`, { year, mediaCount: yearData.media.length });
+    duplicateLogger.info('Found media items in year database', { year, mediaCount: yearData.media.length });
     
-    duplicateLogger.debug(`Files in year database`, { 
+    duplicateLogger.debug('Files in year database', { 
       year, 
       files: yearData.media.map((media: MediaMetadata, index: number) => ({
         index: index + 1,
         filename: media.originalFilename,
-        hashPrefix: media.metadata?.hash?.substring(0, 16) + '...',
+        hashPrefix: media.metadata?.hash ? maskHash(media.metadata.hash) : 'no-hash',
         takenAt: media.takenAt
       }))
     });
@@ -94,15 +95,15 @@ async function checkYearForDuplicate(hash: string, year: number): Promise<Duplic
     for (const media of yearData.media) {
       const mediaHash = media.metadata?.hash;
       if (mediaHash) {
-        duplicateLogger.debug(`Comparing hashes`, {
-          targetHash: hash.substring(0, 16) + '...',
-          mediaHash: mediaHash.substring(0, 16) + '...',
+        duplicateLogger.debug('Comparing hashes', {
+          targetHash: maskHash(hash),
+          mediaHash: maskHash(mediaHash),
           filename: media.originalFilename
         });
         
         if (mediaHash === hash) {
           const existingMedia = { ...media };
-          duplicateLogger.info(`Duplicate found`, {
+          duplicateLogger.info('Duplicate found', {
             filename: existingMedia.originalFilename,
             id: existingMedia.id,
             year
@@ -116,10 +117,10 @@ async function checkYearForDuplicate(hash: string, year: number): Promise<Duplic
       }
     }
 
-    duplicateLogger.debug(`No matching hash found in year database`, { year });
+    duplicateLogger.debug('No matching hash found in year database', { year });
     return { isDuplicate: false, hash };
   } catch (error) {
-    duplicateLogger.error(`Error reading year database`, { 
+    duplicateLogger.error('Error reading year database', { 
       year, 
       error: error instanceof Error ? error.message : 'Unknown error' 
     });

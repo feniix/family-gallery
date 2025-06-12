@@ -10,6 +10,7 @@ import { generateUniqueFilename } from './file-naming';
 import { checkForDuplicate } from './duplicate-detection';
 import { MediaMetadata } from '../types/media';
 import { uploadLogger } from './logger';
+import { generateHashFromArrayBuffer, generateTransactionId } from './utils/hash-generation';
 
 export interface UploadTransactionOptions {
   userId: string;
@@ -196,10 +197,7 @@ export class UploadTransactionManager {
      await this.executeStep(transaction, 'duplicate-check', async (step) => {
        // Generate file hash for duplicate checking
        const arrayBuffer = await file.arrayBuffer();
-       const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-       fileHash = Array.from(new Uint8Array(hashBuffer))
-         .map(b => b.toString(16).padStart(2, '0'))
-         .join('');
+       fileHash = await generateHashFromArrayBuffer(arrayBuffer);
        
        const duplicateCheck = await checkForDuplicate(fileHash, new Date());
        if (duplicateCheck.isDuplicate && duplicateCheck.existingMedia) {
@@ -262,7 +260,7 @@ export class UploadTransactionManager {
     mediaMetadata.filename = filenameResult.filename;
     mediaMetadata.path = originalFilePath;
     mediaMetadata.thumbnailPath = thumbnailFilePath;
-    mediaMetadata.id = `media_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    mediaMetadata.id = generateTransactionId();
 
     // Set hash from duplicate check
     const duplicateStep = transaction.steps.find(s => s.id === 'duplicate-check');

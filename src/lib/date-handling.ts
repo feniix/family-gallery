@@ -1,5 +1,6 @@
 import { ExifMetadata, DateProcessingResult } from '@/types/media';
 import { uploadLogger } from './logger';
+import { extractDateFromFilename as extractDateFromFilename_Shared } from './utils/filename-patterns';
 // Using basic date formatting instead of date-fns for now
 function formatDate(date: Date): string {
   return date.toISOString().replace('T', ' ').substring(0, 19);
@@ -140,58 +141,16 @@ function estimateTimezoneFromCoordinates(latitude: number, longitude: number): s
  * Extract date from various filename patterns
  */
 function extractDateFromFilename(filename: string): Date | null {
-  const patterns = [
-    // WhatsApp patterns: IMG-20240115-WA0001.jpg
-    /IMG-(\d{4})(\d{2})(\d{2})-WA\d{4}/,
-    /VID-(\d{4})(\d{2})(\d{2})-WA\d{4}/,
-    
-    // Screenshot patterns: Screenshot_20240115_143022.jpg
-    /Screenshot_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/,
-    
-    // Common camera patterns: IMG_20240115_143022.jpg
-    /IMG_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/,
-    /DSC_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/,
-    
-    // Date with dashes: 2024-01-15_14-30-22.jpg
-    /(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})/,
-    
-    // Simple date patterns: 20240115.jpg
-    /(\d{4})(\d{2})(\d{2})/,
-  ];
-  
-  for (const pattern of patterns) {
-    const match = filename.match(pattern);
-    if (match) {
-      try {
-        const year = parseInt(match[1]);
-        const month = parseInt(match[2]) - 1; // JS months are 0-indexed
-        const day = parseInt(match[3]);
-        
-        // Check if we have time components
-        const hour = match[4] ? parseInt(match[4]) : 12;
-        const minute = match[5] ? parseInt(match[5]) : 0;
-        const second = match[6] ? parseInt(match[6]) : 0;
-        
-        const date = new Date(year, month, day, hour, minute, second);
-        
-        // Validate the date
-        if (!isNaN(date.getTime()) && 
-            year >= 2000 && year <= new Date().getFullYear() + 1 &&
-            month >= 0 && month <= 11 &&
-            day >= 1 && day <= 31) {
-          
-          uploadLogger.debug('Extracted date from filename', { 
-            filename, 
-            date: formatDate(date) 
-          });
-          return date;
-        }
-      } catch (error) {
-        uploadLogger.warn('Failed to parse date from filename', { filename, error });
-      }
-    }
+  const result = extractDateFromFilename_Shared(filename);
+  if (result) {
+    uploadLogger.debug('Extracted date from filename', { 
+      filename, 
+      date: formatDate(result.date),
+      source: result.source,
+      confidence: result.confidence
+    });
+    return result.date;
   }
-  
   return null;
 }
 

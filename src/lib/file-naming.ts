@@ -1,5 +1,9 @@
 import { FileNamingResult } from '@/types/media';
 import { uploadLogger } from './logger';
+import { 
+  sanitizeFilename, 
+  getFileExtension
+} from './utils/filename-patterns';
 
 /**
  * Generate unique filename and path based on date
@@ -39,8 +43,6 @@ export function generateUniqueFilename(originalFilename: string, takenAt: Date):
   };
 }
 
-import { getFileExtension } from '@/lib/utils'
-
 /**
  * Remove extension from filename
  */
@@ -51,23 +53,6 @@ function removeExtension(filename: string): string {
   }
   
   return filename.substring(0, lastDotIndex);
-}
-
-/**
- * Sanitize filename to remove invalid characters
- */
-function sanitizeFilename(filename: string): string {
-  return filename
-    // Remove or replace invalid characters for file systems
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
-    // Remove multiple consecutive underscores
-    .replace(/_+/g, '_')
-    // Remove leading/trailing underscores and dots
-    .replace(/^[_.]+|[_.]+$/g, '')
-    // Limit length
-    .substring(0, 100)
-    // Ensure we have something
-    || 'file';
 }
 
 /**
@@ -87,54 +72,9 @@ function generateThumbnailPath(originalPath: string, extension: string): string 
   return undefined;
 }
 
-// Re-export from consolidated location
-export { generateUniqueId as generateMediaId } from '@/lib/utils'
-
 /**
- * Validate filename for security and compatibility
- */
-export function validateFilename(filename: string): {
-  isValid: boolean;
-  errors: string[];
-  sanitized: string;
-} {
-  const errors: string[] = [];
-  
-  // Check length
-  if (filename.length === 0) {
-    errors.push('Filename cannot be empty');
-  }
-  
-  if (filename.length > 255) {
-    errors.push('Filename too long (max 255 characters)');
-  }
-  
-  // Check for dangerous patterns
-  const dangerousPatterns = [
-    /\.\./,           // Directory traversal
-    /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i, // Windows reserved names
-    /^\.+$/,          // Only dots
-  ];
-  
-  for (const pattern of dangerousPatterns) {
-    if (pattern.test(filename)) {
-      errors.push('Filename contains invalid patterns');
-      break;
-    }
-  }
-  
-  // Sanitize the filename
-  const sanitized = sanitizeFilename(filename);
-  
-  return {
-    isValid: errors.length === 0,
-    errors,
-    sanitized,
-  };
-}
-
-/**
- * Extract date from WhatsApp filename patterns
+ * Extract date from WhatsApp filename patterns (legacy function - use shared utility instead)
+ * @deprecated Use extractDateFromFilename from utils/filename-patterns.ts instead
  */
 export function extractDateFromWhatsAppFilename(filename: string): Date | null {
   // WhatsApp patterns: IMG-20240115-WA0001.jpg, VID-20240115-WA0001.mp4
@@ -159,38 +99,6 @@ export function extractDateFromWhatsAppFilename(filename: string): Date | null {
 }
 
 /**
- * Check if filename follows specific patterns that might indicate the source
- */
-export function detectFileSource(filename: string): {
-  source: 'whatsapp' | 'screenshot' | 'camera' | 'edited' | 'unknown';
-  confidence: 'high' | 'medium' | 'low';
-} {
-  const lowerName = filename.toLowerCase();
-  
-  // WhatsApp patterns
-  if (/^(img|vid)-\d{8}-wa\d{4}/i.test(filename)) {
-    return { source: 'whatsapp', confidence: 'high' };
-  }
-  
-  // Screenshot patterns
-  if (/screenshot/i.test(lowerName) || /screen.?shot/i.test(lowerName)) {
-    return { source: 'screenshot', confidence: 'high' };
-  }
-  
-  // Camera patterns
-  if (/^(dsc|img)_\d{8}_\d{6}/i.test(filename)) {
-    return { source: 'camera', confidence: 'medium' };
-  }
-  
-  // Edited photo patterns
-  if (/(edit|copy|modified)/.test(lowerName) || /_\d+$/.test(removeExtension(lowerName))) {
-    return { source: 'edited', confidence: 'medium' };
-  }
-  
-  return { source: 'unknown', confidence: 'low' };
-}
-
-/**
  * Generate storage path structure for organizing files
  */
 export function generateStoragePath(date: Date, type: 'originals' | 'thumbnails' | 'web-optimized'): string {
@@ -206,4 +114,13 @@ export function generateStoragePath(date: Date, type: 'originals' | 'thumbnails'
 export function getMetadataJsonPath(date: Date): string {
   const year = date.getFullYear();
   return `media/${year}.json`;
-} 
+}
+
+// Re-export shared utilities for backward compatibility
+export { 
+  validateFilename, 
+  detectFileSource, 
+  sanitizeFilename,
+  isScreenshot,
+  isEditedPhoto
+} from './utils/filename-patterns'; 

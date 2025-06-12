@@ -2,9 +2,9 @@ import { MediaMetadata, ExifMetadata, FileNamingResult } from '@/types/media';
 import { extractExifMetadata, isScreenshot, isEditedPhoto } from './exif';
 import { processDateWithFallbacks } from './date-handling';
 import { generateUniqueFilename } from './file-naming';
-import CryptoJS from 'crypto-js';
 import { isFileSizeValid, getFileSizeLimitDisplay } from '@/lib/config';
 import { uploadLogger } from './logger';
+import { generateFileHash } from './utils/hash-generation';
 
 /**
  * Process metadata for an uploaded file
@@ -111,23 +111,7 @@ export async function processMediaMetadata(
   };
 }
 
-/**
- * Generate SHA-256 hash of file content for duplicate detection
- */
-async function generateFileHash(file: File): Promise<string> {
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
-    const hash = CryptoJS.SHA256(wordArray).toString();
-    
-    uploadLogger.debug(`Generated file hash`, { filename: file.name, hashPrefix: hash.substring(0, 16) + '...' });
-    return hash;
-  } catch (error) {
-    uploadLogger.error('Error generating file hash', { filename: file.name, error: error instanceof Error ? error.message : 'Unknown error' });
-    // Fallback: use file properties
-    return CryptoJS.SHA256(`${file.name}_${file.size}_${file.lastModified}`).toString();
-  }
-}
+// Hash generation function is now imported from shared utilities
 
 /**
  * Extract video metadata using HTML5 video element
