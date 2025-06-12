@@ -155,23 +155,5 @@ export const generateFilePath = {
   },
 };
 
-/**
- * Utility to validate file types
- */
-export const isValidFileType = (filename: string, type: 'image' | 'video' | 'any' = 'any'): boolean => {
-  const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.dng'];
-  const videoTypes = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'];
-  
-  const extension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
-  
-  switch (type) {
-    case 'image':
-      return imageTypes.includes(extension);
-    case 'video':
-      return videoTypes.includes(extension);
-    case 'any':
-      return [...imageTypes, ...videoTypes].includes(extension);
-    default:
-      return false;
-  }
-}; 
+// Re-export from consolidated location
+export { isValidFileType } from '@/lib/utils'; 

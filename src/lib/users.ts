@@ -16,6 +16,8 @@ export interface UsersData {
   users: Record<string, User>
 }
 
+import { isAdminEmail } from '@/lib/utils'
+
 /**
  * Create a new user object
  */
@@ -39,20 +41,6 @@ export function createUser(data: {
     approvedAt: isAdmin ? new Date().toISOString() : undefined,
     status: isAdmin ? 'approved' : 'pending',
   }
-}
-
-/**
- * Check if an email address should be an admin
- */
-function isAdminEmail(email: string): boolean {
-  // Check both server-side and client-side environment variables
-  const serverAdminEmails = process.env.ADMIN_EMAILS?.split(',').map(email => email.trim()) || []
-  const publicAdminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(email => email.trim()) || []
-  
-  // Combine both arrays and remove duplicates
-  const allAdminEmails = [...new Set([...serverAdminEmails, ...publicAdminEmails])]
-  
-  return allAdminEmails.includes(email.trim())
 }
 
 /**

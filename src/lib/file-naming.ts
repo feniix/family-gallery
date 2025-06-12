@@ -39,17 +39,7 @@ export function generateUniqueFilename(originalFilename: string, takenAt: Date):
   };
 }
 
-/**
- * Get file extension from filename
- */
-function getFileExtension(filename: string): string {
-  const lastDotIndex = filename.lastIndexOf('.');
-  if (lastDotIndex === -1) {
-    return '';
-  }
-  
-  return filename.substring(lastDotIndex + 1).toLowerCase();
-}
+import { getFileExtension } from '@/lib/utils'
 
 /**
  * Remove extension from filename
@@ -97,16 +87,8 @@ function generateThumbnailPath(originalPath: string, extension: string): string 
   return undefined;
 }
 
-/**
- * Generate a unique ID for media items
- */
-export function generateMediaId(): string {
-  // Generate a unique ID using timestamp and random string
-  const timestamp = Date.now().toString(36);
-  const randomStr = Math.random().toString(36).substring(2, 8);
-  
-  return `${timestamp}_${randomStr}`;
-}
+// Re-export from consolidated location
+export { generateUniqueId as generateMediaId } from '@/lib/utils'
 
 /**
  * Validate filename for security and compatibility

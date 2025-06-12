@@ -110,19 +110,9 @@ export async function requireAuth() {
   return userId
 }
 
-/**
- * Check if an email address should be an admin
- */
-export function isAdminEmail(email: string): boolean {
-  // Check both server-side and client-side environment variables
-  const serverAdminEmails = process.env.ADMIN_EMAILS?.split(',').map(email => email.trim()) || []
-  const publicAdminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(email => email.trim()) || []
-  
-  // Combine both arrays and remove duplicates
-  const allAdminEmails = [...new Set([...serverAdminEmails, ...publicAdminEmails])]
-  
-  return allAdminEmails.includes(email.trim())
-}
+// Re-export from consolidated location
+import { isAdminEmail } from '@/lib/utils'
+export { isAdminEmail }
 
 /**
  * Get user role based on email

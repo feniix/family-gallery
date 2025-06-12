@@ -115,19 +115,14 @@ export async function getPresignedUploadUrl(
   return response.json()
 }
 
+// Use consolidated version that supports more specific validation
+import { isValidFileType as validateFileType } from '@/lib/utils'
+
 /**
- * Validate file type
+ * Validate file type (simplified wrapper for backward compatibility)
  */
 export function isValidFileType(filename: string): boolean {
-  const validExtensions = [
-    // Images
-    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.dng',
-    // Videos
-    '.mp4', '.mov', '.avi', '.quicktime'
-  ]
-
-  const extension = filename.toLowerCase().substring(filename.lastIndexOf('.'))
-  return validExtensions.includes(extension)
+  return validateFileType(filename, 'any')
 }
 
 /**
@@ -137,32 +132,9 @@ export function isValidFileSize(fileSize: number, maxSize: number = 50 * 1024 * 
   return fileSize <= maxSize
 }
 
-/**
- * Format file size for display
- */
-export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes'
-  
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
-
-/**
- * Generate unique file ID for tracking
- */
-export function generateFileId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-}
-
-/**
- * Extract file extension
- */
-export function getFileExtension(filename: string): string {
-  return filename.toLowerCase().substring(filename.lastIndexOf('.') + 1)
-}
+// Re-export utilities from consolidated location
+import { formatFileSize, generateUniqueId, getFileExtension } from '@/lib/utils'
+export { formatFileSize, generateUniqueId as generateFileId, getFileExtension }
 
 /**
  * Check if file is an image
@@ -198,7 +170,7 @@ export interface UploadQueueItem {
  */
 export function createUploadQueueItem(file: File): UploadQueueItem {
   return {
-    id: generateFileId(),
+    id: generateUniqueId(),
     file,
     status: 'pending',
     progress: 0,
