@@ -27,6 +27,7 @@ import type { UploadFile } from '@/types/upload';
 import { extractExifMetadata } from '@/lib/exif';
 import { generateVideoThumbnail } from '@/lib/video-processing';
 import type { MediaMetadata } from '@/types/media';
+import { uploadLogger, exifLogger } from '@/lib/logger';
 
 interface BulkUploadZoneProps {
   availableTags: string[];
@@ -169,16 +170,17 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
       if (uploadFile.file.type.startsWith('image/')) {
         try {
           const exifData = await extractExifMetadata(uploadFile.file);
-          console.log('Generating thumbnail for:', uploadFile.file.name);
+          uploadLogger.info('Generating thumbnail for file', { filename: uploadFile.file.name });
           const imageThumbnail = await generateImageThumbnail(uploadFile.file, {
             width: 320,
             height: 240,
             quality: 0.8
           });
-          console.log('Thumbnail generated:', {
+          uploadLogger.info('Thumbnail generated', {
             filename: uploadFile.file.name,
             thumbnailSize: imageThumbnail?.size || 0,
-            thumbnailExists: !!imageThumbnail
+            originalSize: uploadFile.file.size,
+            type: uploadFile.file.type
           });
           setState(prev => ({
             ...prev,
@@ -187,7 +189,11 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
             )
           }));
         } catch (error) {
-          console.error('EXIF extraction or thumbnail generation failed:', error);
+          exifLogger.error('EXIF extraction or thumbnail generation failed', { 
+            filename: uploadFile.file.name,
+            error: error instanceof Error ? error.message : String(error)
+          });
+          // Continue without thumbnail
         }
       } else if (uploadFile.file.type.startsWith('video/')) {
         try {
@@ -208,7 +214,11 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
             )
           }));
         } catch (error) {
-          console.error('Video thumbnail generation failed:', error);
+          uploadLogger.error('Video thumbnail generation failed', { 
+            filename: uploadFile.file.name,
+            error: error instanceof Error ? error.message : String(error)
+          });
+          // Continue without thumbnail
         }
       }
     }
@@ -392,59 +402,35 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
           // Upload thumbnail if generated
           if (uploadFile.imageThumbnail && fileNaming.thumbnailPath) {
             try {
-              console.log('Uploading thumbnail:', {
-                thumbnailPath: fileNaming.thumbnailPath,
-                thumbnailSize: uploadFile.imageThumbnail.size,
-                originalFilename: uploadFile.file.name
+              uploadLogger.info('Generating thumbnail for file', { filename: uploadFile.file.name });
+              const thumbnailBlob = await generateImageThumbnail(uploadFile.file, {
+                width: 320,
+                height: 240,
+                quality: 0.8
               });
-              
-              // Get presigned URL for thumbnail using the API endpoint
-              const thumbnailPresignedResponse = await fetch('/api/upload/presigned', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  filename: `${fileNaming.thumbnailPath.split('/').pop()}`, // Just the filename
-                  contentType: 'image/jpeg',
-                  fileSize: uploadFile.imageThumbnail.size,
-                  customPath: fileNaming.thumbnailPath // Add custom path parameter
-                })
+              uploadLogger.info('Thumbnail generated', {
+                filename: uploadFile.file.name,
+                thumbnailSize: thumbnailBlob?.size || 0,
+                originalSize: uploadFile.file.size,
+                type: uploadFile.file.type
               });
-
-              if (!thumbnailPresignedResponse.ok) {
-                console.warn('Failed to get thumbnail presigned URL:', {
-                  status: thumbnailPresignedResponse.status,
-                  statusText: thumbnailPresignedResponse.statusText
-                });
-                throw new Error(`Failed to get thumbnail presigned URL: ${thumbnailPresignedResponse.status}`);
-              }
-
-              const { presignedUrl: thumbnailPresignedUrl } = await thumbnailPresignedResponse.json();
-              
-              const thumbnailUploadResponse = await fetch(thumbnailPresignedUrl, {
-                method: 'PUT',
-                body: uploadFile.imageThumbnail,
-                headers: { 'Content-Type': 'image/jpeg' }
+              setState(prev => ({
+                ...prev,
+                files: prev.files.map(f => 
+                  f.id === uploadFile.id ? { ...f, imageThumbnail: thumbnailBlob } : f
+                )
+              }));
+            } catch (error) {
+              exifLogger.error('EXIF extraction or thumbnail generation failed', { 
+                filename: uploadFile.file.name,
+                error: error instanceof Error ? error.message : String(error)
               });
-              
-              if (!thumbnailUploadResponse.ok) {
-                console.warn('Thumbnail upload failed:', {
-                  status: thumbnailUploadResponse.status,
-                  statusText: thumbnailUploadResponse.statusText,
-                  thumbnailPath: fileNaming.thumbnailPath
-                });
-              } else {
-                console.log('Thumbnail uploaded successfully:', fileNaming.thumbnailPath);
-              }
-            } catch (thumbnailError) {
-              console.warn('Thumbnail upload failed:', thumbnailError);
+              // Continue without thumbnail
             }
           } else {
-            console.log('No thumbnail to upload:', {
-              hasThumbnail: !!uploadFile.imageThumbnail,
-              thumbnailSize: uploadFile.imageThumbnail?.size,
-              hasThumbnailPath: !!fileNaming.thumbnailPath,
-              thumbnailPath: fileNaming.thumbnailPath,
-              originalFilename: uploadFile.file.name
+            uploadLogger.info('No thumbnail to upload', {
+              filename: uploadFile.file.name,
+              hasBlob: !!uploadFile.imageThumbnail
             });
           }
 
@@ -521,7 +507,10 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
         }));
 
       } catch (error) {
-        console.error('Upload failed:', error);
+        uploadLogger.error('Upload failed', { 
+          filename: uploadFile.file.name,
+          error: error instanceof Error ? error.message : String(error)
+        });
         setState(prev => ({
           ...prev,
           files: prev.files.map(f => 

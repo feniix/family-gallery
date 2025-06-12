@@ -50,6 +50,7 @@ import {
 } from 'lucide-react';
 import { BulkUploadZone } from '@/components/admin/bulk-upload-zone';
 import type { MediaMetadata } from '@/types/media';
+import { apiLogger } from '@/lib/logger';
 
 interface MediaManagerState {
   media: MediaMetadata[];
@@ -132,7 +133,9 @@ export default function MediaManagerPage() {
         throw new Error('Failed to load data');
       }
     } catch (error) {
-      console.error('Error loading data:', error);
+      apiLogger.error('Error loading data', { 
+        error: error instanceof Error ? error.message : String(error)
+      });
       toast.error('Failed to load media and tags');
       setState(prev => ({ ...prev, loading: false }));
     }
@@ -155,7 +158,11 @@ export default function MediaManagerPage() {
         toast.error(errorData.error || 'Failed to delete media');
       }
     } catch (error) {
-      console.error('Error deleting media:', error);
+      apiLogger.error('Error deleting media', { 
+        mediaId: mediaId,
+        year: year,
+        error: error instanceof Error ? error.message : String(error)
+      });
       toast.error('Failed to delete media');
     }
   };
@@ -218,8 +225,12 @@ export default function MediaManagerPage() {
         toast.error(errorData.error || 'Bulk operation failed');
       }
     } catch (error) {
-      console.error('Error in bulk operation:', error);
-      toast.error('Failed to perform bulk operation');
+      apiLogger.error('Error in bulk operation', { 
+        operation: action,
+        selectedCount: selectedIds.length,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      toast.error(`Failed to ${action} media`);
     }
   };
 
@@ -251,7 +262,11 @@ export default function MediaManagerPage() {
         toast.error(errorData.error || 'Failed to update date');
       }
     } catch (error) {
-      console.error('Error updating date:', error);
+      apiLogger.error('Error updating date', { 
+        mediaId: mediaId,
+        newDate: newDate,
+        error: error instanceof Error ? error.message : String(error)
+      });
       toast.error('Failed to update date');
     }
   };
@@ -284,7 +299,11 @@ export default function MediaManagerPage() {
         toast.error(errorData.error || 'Failed to update tags');
       }
     } catch (error) {
-      console.error('Error updating tags:', error);
+      apiLogger.error('Error updating tags', { 
+        mediaId: mediaId,
+        tags: tags,
+        error: error instanceof Error ? error.message : String(error)
+      });
       toast.error('Failed to update tags');
     }
   };
@@ -320,7 +339,10 @@ export default function MediaManagerPage() {
         toast.error(errorData.error || 'Failed to create tag');
       }
     } catch (error) {
-      console.error('Error creating tag:', error);
+      apiLogger.error('Error creating tag', { 
+        tag: newTag,
+        error: error instanceof Error ? error.message : String(error)
+      });
       toast.error('Failed to create tag');
     }
   };
@@ -350,7 +372,10 @@ export default function MediaManagerPage() {
         toast.error(errorData.error || 'Failed to delete tag');
       }
     } catch (error) {
-      console.error('Error deleting tag:', error);
+      apiLogger.error('Error deleting tag', { 
+        tag: tag,
+        error: error instanceof Error ? error.message : String(error)
+      });
       toast.error('Failed to delete tag');
     }
   };

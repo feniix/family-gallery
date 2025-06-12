@@ -6,6 +6,7 @@ import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MediaMetadata } from '@/types/media';
 import { format } from 'date-fns';
 import { getVideoMimeType } from '@/lib/video-processing';
+import { createLogger } from '@/lib/logger';
 
 interface SimpleLightboxProps {
   media: MediaMetadata;
@@ -22,6 +23,8 @@ interface ImageDimensions {
   height: number;
   aspectRatio: number;
 }
+
+const lightboxLogger = createLogger('LIGHTBOX');
 
 export function SimpleLightbox({
   media,
@@ -45,41 +48,51 @@ export function SimpleLightbox({
     // First try to use metadata if available
     if (media.metadata?.width && media.metadata?.height) {
       const aspectRatio = media.metadata.width / media.metadata.height;
+      lightboxLogger.debug('Using metadata dimensions', { 
+        filename: media.originalFilename,
+        width: media.metadata.width,
+        height: media.metadata.height,
+        aspectRatio: aspectRatio.toFixed(2)
+      });
       setImageDimensions({
         width: media.metadata.width,
         height: media.metadata.height,
         aspectRatio
       });
       setImageLoading(false);
-      console.log(`Using metadata dimensions: ${media.metadata.width}x${media.metadata.height} (${aspectRatio.toFixed(2)})`);
-      return;
+    } else {
+      // If no metadata, load image to get natural dimensions
+      const img = new window.Image();
+      img.onload = () => {
+        const aspectRatio = img.naturalWidth / img.naturalHeight;
+        lightboxLogger.debug('Auto-detected dimensions', { 
+          filename: media.originalFilename,
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+          aspectRatio: aspectRatio.toFixed(2)
+        });
+        setImageDimensions({
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+          aspectRatio
+        });
+        setImageLoading(false);
+      };
+      
+      img.onerror = () => {
+        lightboxLogger.warn('Failed to load image dimensions, using fallback', { 
+          filename: media.originalFilename 
+        });
+        setImageDimensions({
+          width: 800,
+          height: 600,
+          aspectRatio: 4/3
+        });
+        setImageLoading(false);
+      };
+
+      img.src = `/api/media/download/${media.id}`;
     }
-
-    // If no metadata, load image to get natural dimensions
-    const img = new window.Image();
-    img.onload = () => {
-      const aspectRatio = img.naturalWidth / img.naturalHeight;
-      setImageDimensions({
-        width: img.naturalWidth,
-        height: img.naturalHeight,
-        aspectRatio
-      });
-      setImageLoading(false);
-      console.log(`Auto-detected dimensions: ${img.naturalWidth}x${img.naturalHeight} (${aspectRatio.toFixed(2)})`);
-    };
-    
-    img.onerror = () => {
-      // Fallback dimensions
-      setImageDimensions({
-        width: 1600,
-        height: 1200,
-        aspectRatio: 4/3
-      });
-      setImageLoading(false);
-      console.warn(`Failed to load image dimensions, using fallback`);
-    };
-
-    img.src = `/api/media/download/${media.id}`;
   }, [media, isOpen]);
 
   // Handle keyboard navigation

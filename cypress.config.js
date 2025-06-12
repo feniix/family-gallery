@@ -11,7 +11,7 @@ module.exports = defineConfig({
     pageLoadTimeout: 30000,
     video: false,
     screenshotOnRunFailure: true,
-    supportFile: 'cypress/support/e2e.js',
+    supportFile: 'cypress/support/e2e.ts',
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
     env: {
       // Test user credentials from environment variables
@@ -24,7 +24,14 @@ module.exports = defineConfig({
       // implement node event listeners here
       on('task', {
         log(message) {
-          console.log(message);
+          // Use structured logging for Cypress tasks
+          const logEntry = {
+            time: new Date().toISOString(),
+            level: 'info',
+            msg: message,
+            module: 'CYPRESS'
+          };
+          console.log(JSON.stringify(logEntry));
           return null;
         },
       });

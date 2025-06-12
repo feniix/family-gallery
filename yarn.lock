@@ -4183,6 +4183,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/commander@npm:^2.12.5":
+  version: 2.12.5
+  resolution: "@types/commander@npm:2.12.5"
+  dependencies:
+    commander: "npm:*"
+  checksum: 10c0/2ac2607329b83a74df0c86bba035edd8e9a6191a520cca20f360cef6fa7d7d755de1c006b86a73933394abacd7622a339b508bb6b467dd06cdee7b6ef35ec66c
+  languageName: node
+  linkType: hard
+
 "@types/cookie@npm:^0.6.0":
   version: 0.6.0
   resolution: "@types/cookie@npm:0.6.0"
@@ -5660,6 +5669,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"commander@npm:*, commander@npm:^14.0.0":
+  version: 14.0.0
+  resolution: "commander@npm:14.0.0"
+  checksum: 10c0/73c4babfa558077868d84522b11ef56834165d472b9e86a634cd4c3ae7fc72d59af6377d8878e06bd570fe8f3161eced3cbe383c38f7093272bb65bd242b595b
+  languageName: node
+  linkType: hard
+
 "commander@npm:^6.2.1":
   version: 6.2.1
   resolution: "commander@npm:6.2.1"
@@ -6983,6 +6999,7 @@ __metadata:
     "@testing-library/jest-dom": "npm:^6.6.3"
     "@testing-library/react": "npm:^16.0.0"
     "@testing-library/user-event": "npm:^14.5.2"
+    "@types/commander": "npm:^2.12.5"
     "@types/crypto-js": "npm:^4.2.2"
     "@types/jest": "npm:^29.5.14"
     "@types/node": "npm:^24.0.0"
@@ -6995,6 +7012,7 @@ __metadata:
     alasql: "npm:^4.6.6"
     class-variance-authority: "npm:^0.7.1"
     clsx: "npm:^2.1.1"
+    commander: "npm:^14.0.0"
     crypto-js: "npm:^4.2.0"
     cypress: "npm:^14.4.1"
     date-fns: "npm:^4.1.0"
@@ -7027,6 +7045,8 @@ __metadata:
     ts-jest: "npm:^29.2.5"
     tsx: "npm:^4.20.0"
     typescript: "npm:^5"
+  bin:
+    fg-import: ./scripts/fg-import.js
   languageName: unknown
   linkType: soft
 

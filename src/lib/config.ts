@@ -1,6 +1,7 @@
 /// <reference types="node" />
 
 import { validateRequiredEnvVars } from './utils/error-handling';
+import { createLogger } from './logger';
 
 /**
  * Application configuration
@@ -202,15 +203,15 @@ const requiredEnvVars = [
   'ADMIN_EMAILS',
 ];
 
+const configLogger = createLogger('CONFIG');
+
 // Perform validation on server startup
 if (typeof window === 'undefined') {
   try {
     validateRequiredEnvVars(requiredEnvVars);
   } catch (error) {
-    console.error('Configuration validation failed:', error);
-    if (process.env.NODE_ENV === 'production') {
-      process.exit(1);
-    }
+    configLogger.error('Configuration validation failed', { error: error instanceof Error ? error.message : String(error) });
+    throw error;
   }
 }
 
