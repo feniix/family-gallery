@@ -10,10 +10,13 @@ import Link from 'next/link'
 export default function Home() {
   const { isLoaded, isSignedIn } = useUser();
 
-  // Redirect anonymous users to sign-in
+  // Redirect anonymous users to sign-in, approved users to gallery
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
       window.location.href = '/sign-in';
+    } else if (isLoaded && isSignedIn) {
+      // Let middleware handle routing based on approval status
+      window.location.href = '/gallery';
     }
   }, [isLoaded, isSignedIn]);
 

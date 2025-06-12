@@ -20,6 +20,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { UserPermissions } from '@/lib/access-control';
 import { MediaMetadata } from '@/types/media';
+import { authLogger } from '@/lib/logger';
 
 
 
@@ -97,7 +98,6 @@ export default function AccessControlPanel({ isAdmin }: AccessControlPanelProps)
   const [advancedSearch, setAdvancedSearch] = useState({
     text: '',
     tags: [] as string[],
-    subjects: [] as string[],
     dateRange: { start: '', end: '' },
     camera: '',
     fileType: '' as 'photo' | 'video' | '',
@@ -159,7 +159,7 @@ export default function AccessControlPanel({ isAdmin }: AccessControlPanelProps)
       setStats(mockStats);
       
     } catch (error) {
-      console.error('Error loading access control data:', error);
+      authLogger.error('Error loading access control data', { error });
       toast.error('Failed to load access control data');
     } finally {
       setLoading(false);
@@ -194,8 +194,7 @@ export default function AccessControlPanel({ isAdmin }: AccessControlPanelProps)
             size: 2048000,
             hash: 'abc123def456'
           },
-          tags: ['vacation', 'beach'],
-          subjects: ['rufina', 'bernabe'],
+          tags: ['vacation', 'beach', 'rufina', 'bernabe'],
           thumbnailPath: '/media/2024/vacation_2024_thumb.jpg',
           hasValidExif: true
         }
@@ -205,7 +204,7 @@ export default function AccessControlPanel({ isAdmin }: AccessControlPanelProps)
       toast.success(`Found ${mockResults.length} results`);
       
     } catch (error) {
-      console.error('Error performing advanced search:', error);
+      authLogger.error('Error performing advanced search', { error });
       toast.error('Advanced search failed');
     } finally {
       setLoading(false);
@@ -220,7 +219,7 @@ export default function AccessControlPanel({ isAdmin }: AccessControlPanelProps)
       ));
       toast.success('User permissions updated successfully');
     } catch (error) {
-      console.error('Error updating user permissions:', error);
+      authLogger.error('Error updating user permissions', { error });
       toast.error('Failed to update user permissions');
     }
   };
@@ -228,11 +227,11 @@ export default function AccessControlPanel({ isAdmin }: AccessControlPanelProps)
   const bulkUpdateMediaPermissions = async (mediaIds: string[], updates: Record<string, unknown>) => {
     setLoading(true);
     try {
+      authLogger.debug('Bulk updating media', { mediaIds, updates });
       // Mock bulk update for now
-      console.log('Bulk updating media:', mediaIds, updates);
       toast.success(`Updated permissions for ${mediaIds.length} media items`);
     } catch (error) {
-      console.error('Error in bulk update:', error);
+      authLogger.error('Error in bulk update', { error });
       toast.error('Bulk update failed');
     } finally {
       setLoading(false);
@@ -410,7 +409,7 @@ export default function AccessControlPanel({ isAdmin }: AccessControlPanelProps)
                 <div>
                   <Label>Text Search</Label>
                   <Input
-                    placeholder="Search filenames, tags, subjects..."
+                    placeholder="Search filenames, tags..."
                     value={advancedSearch.text}
                     onChange={(e) => setAdvancedSearch(prev => ({ ...prev, text: e.target.value }))}
                   />
@@ -509,7 +508,7 @@ export default function AccessControlPanel({ isAdmin }: AccessControlPanelProps)
                           <Badge>family</Badge>
                         </div>
                         <div className="text-sm text-muted-foreground mt-1">
-                          Tags: {result.tags.join(', ')} | Subjects: {result.subjects.join(', ')}
+                          Tags: {result.tags.join(', ')}
                         </div>
                       </div>
                     ))}

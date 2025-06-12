@@ -107,7 +107,6 @@ export interface MediaMetadata {
     bitrate?: number;
     framerate?: number;
   };
-  subjects: string[];
   tags: string[];
   thumbnailPath?: string;
   // File processing flags
@@ -139,11 +138,16 @@ export interface MediaIndex {
  * User database structure
  */
 export interface UserData {
+  id: string;
   email: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'family' | 'extended-family' | 'friend' | 'guest';
   name: string;
   provider: string;
   created: string;
+  approved: boolean;
+  approvedBy?: string;
+  approvedAt?: string;
+  status: 'pending' | 'approved' | 'suspended';
 }
 
 /**
@@ -157,7 +161,6 @@ export interface UsersData {
  * Configuration database structure
  */
 export interface ConfigData {
-  subjects: string[];
   tags: string[];
 }
 

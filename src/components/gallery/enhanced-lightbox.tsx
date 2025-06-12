@@ -6,6 +6,7 @@ import 'photoswipe/style.css';
 import { MediaMetadata } from '@/types/media';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
+import { getVideoMimeType } from '@/lib/video-processing';
 
 interface EnhancedLightboxProps {
   media: MediaMetadata;
@@ -104,6 +105,24 @@ export function EnhancedLightbox({
     };
   }, [isOpen, currentIndex, allMedia, onNext, onPrevious, onClose]);
 
+  // Hide PhotoSwipe when video is playing to prevent interference
+  useEffect(() => {
+    if (!pswpInstanceRef.current) return;
+    
+    const pswpElement = pswpRef.current;
+    if (!pswpElement) return;
+    
+    if (media?.type === 'video') {
+      // Hide PhotoSwipe UI to prevent interference with video controls
+      pswpElement.style.visibility = 'hidden';
+      pswpElement.style.pointerEvents = 'none';
+    } else {
+      // Show PhotoSwipe UI for images
+      pswpElement.style.visibility = 'visible';
+      pswpElement.style.pointerEvents = 'auto';
+    }
+  }, [media?.type]);
+
   // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -130,10 +149,10 @@ export function EnhancedLightbox({
 
   return (
     <>
-      {/* PhotoSwipe container */}
+      {/* PhotoSwipe container - hide when video is displayed */}
       <div 
         ref={pswpRef}
-        className="pswp" 
+        className={`pswp ${media?.type === 'video' ? 'hidden' : ''}`}
         tabIndex={-1} 
         role="dialog" 
         aria-hidden="true"
@@ -172,8 +191,8 @@ export function EnhancedLightbox({
         </div>
       </div>
 
-      {/* Custom metadata overlay */}
-      <div className="pswp__metadata fixed bottom-4 left-4 right-4 bg-black/80 backdrop-blur-sm text-white p-4 rounded-lg z-[2000] hidden">
+      {/* Custom metadata overlay - hide when video is displayed */}
+      <div className={`pswp__metadata fixed bottom-4 left-4 right-4 bg-black/80 backdrop-blur-sm text-white p-4 rounded-lg z-[2000] ${media?.type === 'video' ? 'hidden' : ''}`}>
         {media && (
           <div className="space-y-2 text-sm">
             <div className="font-semibold">{media.originalFilename}</div>
@@ -205,12 +224,17 @@ export function EnhancedLightbox({
           <div className="relative w-full h-full max-w-4xl max-h-full">
             <video
               ref={videoRef}
-              src={`/api/media/download/${media.id}`}
               controls
               autoPlay
               className="w-full h-full object-contain"
               poster={`/api/media/download/${media.id}/thumbnail`}
-            />
+            >
+              <source src={`/api/media/download/${media.id}`} type={getVideoMimeType(media.originalFilename)} />
+              {/* Fallback sources for better compatibility */}
+              <source src={`/api/media/download/${media.id}`} type="video/mp4" />
+              <source src={`/api/media/download/${media.id}`} type="video/webm" />
+              Your browser does not support the video tag.
+            </video>
             
             {/* Close button */}
             <button
@@ -243,4 +267,4 @@ export function EnhancedLightbox({
       )}
     </>
   );
-} 
+}

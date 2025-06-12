@@ -14,6 +14,7 @@ import {
   createResizeHandler,
   getLoadingStrategy 
 } from '@/lib/performance';
+import { dbLogger } from '@/lib/logger'
 
 interface VirtualPhotoGridProps {
   onPhotoClick: (media: MediaMetadata, index: number) => void;
@@ -156,8 +157,10 @@ export function VirtualPhotoGrid({
   useEffect(() => {
     const checkMemory = () => {
       const memoryCheck = performanceMonitor.current.checkMemoryUsage();
-      if (memoryCheck.needsCleanup) {
-        console.warn('High memory usage detected, triggering cleanup');
+      if (memoryCheck.needsCleanup && memoryManager.current) {
+        dbLogger.warn('High memory usage detected, triggering cleanup', {
+          memoryUsage: memoryCheck.usage
+        })
         memoryManager.current.clearCache();
       }
     };

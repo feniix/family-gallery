@@ -11,6 +11,7 @@ import {
   MediaMemoryManager, 
   getLoadingStrategy 
 } from '@/lib/performance';
+import { dbLogger } from '@/lib/logger'
 
 interface PhotoGridProps {
   onPhotoClick: (media: MediaMetadata, index: number) => void;
@@ -54,8 +55,15 @@ export function PhotoGrid({
     const checkMemory = () => {
       const memoryCheck = performanceMonitor.current!.checkMemoryUsage();
       if (memoryCheck.needsCleanup && memoryManager.current) {
-        console.warn('High memory usage detected, triggering cleanup');
-        memoryManager.current.clearCache();
+        const usedMemory = memoryManager.current.getCacheStats().totalCached;
+        const MEMORY_THRESHOLD = 1000000; // Define MEMORY_THRESHOLD
+        if (usedMemory > MEMORY_THRESHOLD) {
+          dbLogger.warn('High memory usage detected, triggering cleanup', { 
+            usedMemory: Math.round(usedMemory), 
+            threshold: MEMORY_THRESHOLD 
+          });
+          memoryManager.current.clearCache();
+        }
       }
     };
 

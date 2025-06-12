@@ -21,6 +21,7 @@ import {
   HardDrive
 } from 'lucide-react'
 import { toast } from 'sonner'
+import UserManagementPanel from '@/components/admin/user-management-panel'
 
 interface DashboardStats {
   media: {
@@ -44,7 +45,7 @@ interface DashboardStats {
       id: string
       email: string
       name: string
-      role: 'admin' | 'user'
+      role: 'admin' | 'family' | 'extended-family' | 'friend' | 'guest'
       created: string
       lastLogin?: string
     }>
@@ -150,6 +151,12 @@ export default function AdminDashboardPage() {
             </p>
           </div>
           <div className="flex space-x-2">
+            <Button asChild variant="outline" size="sm">
+              <a href="/admin/media-manager">
+                <Settings className="h-4 w-4 mr-2" />
+                Media Manager
+              </a>
+            </Button>
             <Button onClick={fetchStats} variant="outline" size="sm">
               <Activity className="h-4 w-4 mr-2" />
               Refresh
@@ -400,39 +407,7 @@ export default function AdminDashboardPage() {
         </TabsContent>
 
         <TabsContent value="users" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>User Management</CardTitle>
-              <CardDescription>Manage user accounts and permissions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {stats.users.recentUsers.map((user) => (
-                  <div key={user.id} className="flex items-center justify-between p-4 border rounded">
-                    <div className="flex items-center space-x-4">
-                      <Users className="h-5 w-5 text-blue-500" />
-                      <div>
-                        <p className="font-medium">{user.name || 'Unknown'}</p>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Joined {new Date(user.created).toLocaleDateString()}
-                          {user.lastLogin && ` • Last login ${new Date(user.lastLogin).toLocaleDateString()}`}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                        {user.role}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-                {stats.users.recentUsers.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No users found</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <UserManagementPanel />
         </TabsContent>
 
         <TabsContent value="system" className="space-y-6">

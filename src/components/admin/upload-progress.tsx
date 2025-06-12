@@ -1,6 +1,6 @@
 'use client'
 
-import { UploadFile } from '@/app/admin/upload/page'
+import { UploadFile } from '@/types/upload'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'

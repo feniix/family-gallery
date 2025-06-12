@@ -472,4 +472,26 @@ export function getVideoFileIcon(file: File): string {
     default:
       return '📺';
   }
+}
+
+/**
+ * Get MIME type for video file based on filename extension
+ */
+export function getVideoMimeType(filename: string): string {
+  const extension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+  
+  switch (extension) {
+    case '.mp4':
+      return 'video/mp4';
+    case '.mov':
+      return 'video/quicktime';
+    case '.avi':
+      return 'video/x-msvideo';
+    case '.webm':
+      return 'video/webm';
+    case '.ogv':
+      return 'video/ogg';
+    default:
+      return 'video/mp4'; // Default fallback
+  }
 } 

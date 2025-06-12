@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { getMediaDb, usersDb, removeYearFromIndex, updateIndexMediaCount, withRetry } from '@/lib/json-db';
+import { getMediaDb, usersDb, addYearToIndex, removeYearFromIndex, updateIndexMediaCount, withRetry } from '@/lib/json-db';
 import { getIsAdmin } from '@/lib/server-auth';
 import type { MediaMetadata, UsersData } from '@/types/media';
 import { apiLogger } from '@/lib/logger';
@@ -164,6 +164,8 @@ export async function POST(request: NextRequest) {
       })
     );
     
+    // Add year to media index
+    await addYearToIndex(year);
     apiLogger.debug(`Added year to media index`, { year });
 
     // Update total media count in index (optional - can be done periodically)

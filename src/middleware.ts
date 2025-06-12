@@ -1,11 +1,17 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { logAccess, createAccessTimer } from '@/lib/access-logger'
+import { checkUserHasAccessSmart } from '@/lib/server-auth'
+import { authLogger } from './lib/logger'
 
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/', // Allow public access to home page for sign-in redirect
+  '/pending-approval', // Allow access to pending approval page
+  '/api/webhooks/(.*)', // Allow access to webhook endpoints
+  '/api/auto-create-admin', // Allow access to auto-create-admin endpoint
+  '/api/debug/cleanup-users', // Allow access to debug cleanup endpoint
 ])
 
 export default clerkMiddleware(async (auth, req) => {
@@ -29,7 +35,24 @@ export default clerkMiddleware(async (auth, req) => {
     if (!authResult.userId) {
       response = authResult.redirectToSignIn();
     } else {
-      response = NextResponse.next();
+      // Debug logging
+      authLogger.debug('Middleware processing request', {
+        userId: authResult.userId,
+        pathname
+      });
+
+      // Check if user has access (check admin email first, then database)
+      const hasAccess = await checkUserHasAccessSmart(authResult);
+      
+      authLogger.debug('Access check completed', { hasAccess, pathname });
+      
+      if (!hasAccess && pathname !== '/pending-approval') {
+        // Redirect to pending approval page
+        const pendingUrl = new URL('/pending-approval', req.url);
+        response = NextResponse.redirect(pendingUrl);
+      } else {
+        response = NextResponse.next();
+      }
     }
   }
   
@@ -53,4 +76,5 @@ export const config = {
     // Always run for API routes
     '/(api|trpc)(.*)',
   ],
-} 
+}
+

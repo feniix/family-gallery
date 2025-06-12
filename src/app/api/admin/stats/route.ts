@@ -47,7 +47,7 @@ export async function GET() {
           id: string;
           email: string;
           name: string;
-          role: 'admin' | 'user';
+          role: 'admin' | 'family' | 'extended-family' | 'friend' | 'guest';
           created: string;
           lastLogin?: string;
         }>
@@ -146,7 +146,7 @@ export async function GET() {
       
       stats.users.total = users.length;
       stats.users.admins = users.filter(u => u.role === 'admin').length;
-      stats.users.regular = users.filter(u => u.role === 'user').length;
+      stats.users.regular = users.filter(u => u.role !== 'admin').length;
 
       // Get recent users (last 10)
       const sortedUsers = users

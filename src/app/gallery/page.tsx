@@ -1,41 +1,37 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useUser } from '@clerk/nextjs'
-import { UserButton } from '@clerk/nextjs'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { PhotoGrid } from '@/components/gallery/photo-grid'
-import { VirtualPhotoGrid } from '@/components/gallery/virtual-photo-grid'
-import { TimelineView } from '@/components/gallery/timeline-view'
-import { Lightbox } from '@/components/gallery/lightbox'
-import { SubjectFilter } from '@/components/gallery/subject-filter'
-import { SearchBar } from '@/components/gallery/search-bar'
-import { MediaMetadata } from '@/types/media'
-import { LayoutGrid, Clock, Filter, Zap, ZapOff, Settings } from 'lucide-react'
-import { isLowPerformanceDevice } from '@/lib/performance'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
+import { UserButton } from '@clerk/nextjs';
+import { 
+  LayoutGrid, 
+  Clock, 
+  Settings, 
+  Zap, 
+  ZapOff
+} from 'lucide-react';
+import { TimelineView } from '@/components/gallery/timeline-view';
+import { PhotoGrid } from '@/components/gallery/photo-grid';
+import { VirtualPhotoGrid } from '@/components/gallery/virtual-photo-grid';
+import { SearchBar } from '@/components/gallery/search-bar';
+import { Lightbox } from '@/components/gallery/lightbox';
+import { MediaMetadata } from '@/types/media';
+import { isLowPerformanceDevice } from '@/lib/performance';
 
 export default function GalleryPage() {
-  const { isLoaded, isSignedIn } = useUser();
-  const [selectedMedia, setSelectedMedia] = useState<MediaMetadata | null>(null);
-  const [selectedIndex, setSelectedIndex] = useState<number>(0);
-  const [allMedia, setAllMedia] = useState<MediaMetadata[]>([]);
-  const [filteredMedia, setFilteredMedia] = useState<MediaMetadata[]>([]);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'timeline'>('timeline');
-  const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
-  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
-  const [showFilters, setShowFilters] = useState(false);
-  const [searchResults, setSearchResults] = useState<MediaMetadata[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const { isLoaded, isSignedIn } = useAuth();
+  const router = useRouter();
   
   // Performance settings
   const [performanceMode, setPerformanceMode] = useState<'auto' | 'performance' | 'quality'>('auto');
@@ -49,54 +45,21 @@ export default function GalleryPage() {
       setVirtualScrollEnabled(performanceMode === 'performance');
     }
   }, [performanceMode]);
+  
+  const [allMedia, setAllMedia] = useState<MediaMetadata[]>([]);
+  const [selectedMedia, setSelectedMedia] = useState<MediaMetadata | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number>(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'timeline'>('timeline');
+  const [searchResults, setSearchResults] = useState<MediaMetadata[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Redirect to sign-in if not authenticated
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
-      window.location.href = '/sign-in';
+      router.push('/sign-in');
     }
-  }, [isLoaded, isSignedIn]);
-
-  const loadAvailableSubjects = async () => {
-    try {
-      const response = await fetch('/api/media/subjects?action=list');
-      if (response.ok) {
-        const data = await response.json();
-        setAvailableSubjects(data.subjects || []);
-      }
-    } catch (error) {
-      console.error('Error loading subjects:', error);
-    }
-  };
-
-  const loadFilteredMedia = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/media/subjects?action=filter&filter=${selectedSubjects.join(',')}`);
-      if (response.ok) {
-        const data = await response.json();
-        setFilteredMedia(data.media || []);
-      }
-    } catch (error) {
-      console.error('Error filtering media:', error);
-      setFilteredMedia([]);
-    }
-  }, [selectedSubjects]);
-
-  // Load available subjects
-  useEffect(() => {
-    if (isSignedIn) {
-      loadAvailableSubjects();
-    }
-  }, [isSignedIn]);
-
-  // Filter media when subjects change
-  useEffect(() => {
-    if (selectedSubjects.length === 0) {
-      setFilteredMedia(allMedia);
-    } else {
-      loadFilteredMedia();
-    }
-  }, [selectedSubjects, allMedia, loadFilteredMedia]);
+  }, [isLoaded, isSignedIn, router]);
 
   const handlePhotoClick = (media: MediaMetadata, index: number) => {
     setSelectedMedia(media);
@@ -108,40 +71,15 @@ export default function GalleryPage() {
     setAllMedia(media);
   };
 
-  const handleSubjectToggle = (subject: string) => {
-    setSelectedSubjects(prev => {
-      if (prev.includes(subject)) {
-        return prev.filter(s => s !== subject);
-      } else {
-        return [...prev, subject];
-      }
-    });
-  };
-
-  const handleClearFilters = () => {
-    setSelectedSubjects([]);
-  };
-
   const handleSearchResults = (results: MediaMetadata[]) => {
     setSearchResults(results);
     setIsSearching(results.length !== allMedia.length || results.length === 0);
   };
 
-  // Determine what media to display based on filters and search
+  // Determine what media to display based on search
   const displayMedia = useMemo(() => {
-    if (isSearching) {
-      // If searching, apply subject filters to search results
-      if (selectedSubjects.length > 0) {
-        return searchResults.filter(media => 
-          media.subjects?.some(subject => selectedSubjects.includes(subject))
-        );
-      }
-      return searchResults;
-    } else {
-      // No search, just apply subject filters
-      return selectedSubjects.length > 0 ? filteredMedia : allMedia;
-    }
-  }, [isSearching, searchResults, selectedSubjects, filteredMedia, allMedia]);
+    return isSearching ? searchResults : allMedia;
+  }, [isSearching, searchResults, allMedia]);
 
   const handlePrevious = () => {
     if (selectedIndex > 0) {
@@ -233,22 +171,6 @@ export default function GalleryPage() {
               </Button>
             </div>
 
-            {/* Filter Toggle */}
-            <Button
-              variant={showFilters ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              className="h-8"
-            >
-              <Filter className="h-4 w-4 mr-1" />
-              Filters
-              {selectedSubjects.length > 0 && (
-                <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                  {selectedSubjects.length}
-                </Badge>
-              )}
-            </Button>
-
             {/* Performance Settings */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -297,19 +219,6 @@ export default function GalleryPage() {
           />
         </div>
 
-        {/* Subject Filter */}
-        {showFilters && availableSubjects.length > 0 && (
-          <div className="mb-6 p-4 bg-muted/50 rounded-lg">
-            <SubjectFilter
-              availableSubjects={availableSubjects}
-              selectedSubjects={selectedSubjects}
-              onSubjectToggle={handleSubjectToggle}
-              onClearFilters={handleClearFilters}
-              mediaCount={displayMedia.length}
-            />
-          </div>
-        )}
-
         {/* Gallery Views */}
         {viewMode === 'timeline' ? (
           <TimelineView 
@@ -341,5 +250,5 @@ export default function GalleryPage() {
         showNavigation={displayMedia.length > 1}
       />
     </div>
-  )
+  );
 } 

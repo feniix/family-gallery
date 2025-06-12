@@ -52,7 +52,7 @@ export interface AccessControlRule {
       start: string;
       end: string;
     };
-    subjects?: string[];
+
   };
   permissions: {
     allowedRoles: string[];
@@ -84,7 +84,7 @@ export class MediaAccessControl {
     allMedia: MediaWithAccessControl[],
     filters: {
       tags?: string[];
-      subjects?: string[];
+
       dateRange?: { start: string; end: string };
       visibility?: string[];
       search?: string;
@@ -137,12 +137,7 @@ export class MediaAccessControl {
         query += ` AND (${tagConditions})`;
       }
 
-      if (filters.subjects?.length) {
-        const subjectConditions = filters.subjects
-          .map(subject => `m.subjects LIKE '%${subject}%'`)
-          .join(' AND ');
-        query += ` AND (${subjectConditions})`;
-      }
+
 
       if (filters.dateRange) {
         query += ` AND m.takenAt BETWEEN ? AND ?`;
@@ -158,7 +153,7 @@ export class MediaAccessControl {
           m.filename LIKE '%${filters.search}%' 
           OR m.originalFilename LIKE '%${filters.search}%'
           OR m.tags LIKE '%${filters.search}%'
-          OR m.subjects LIKE '%${filters.search}%'
+
           OR m.metadata->>'camera' LIKE '%${filters.search}%'
         )`;
       }
@@ -217,7 +212,7 @@ export class MediaAccessControl {
     byVisibility: Record<string, number>;
     byYear: Record<string, number>;
     byType: Record<string, number>;
-    bySubject: Record<string, number>;
+
     topTags: Array<{ tag: string; count: number }>;
     myUploads: number;
   }> {
@@ -258,16 +253,7 @@ export class MediaAccessControl {
           return acc;
         }, {} as Record<string, number>);
 
-      // Subject analytics
-      const subjectCounts: Record<string, number> = {};
-      accessibleMedia.forEach(media => {
-        if (media.subjects) {
-          const subjects = Array.isArray(media.subjects) ? media.subjects : [media.subjects];
-          subjects.forEach(subject => {
-            subjectCounts[subject] = (subjectCounts[subject] || 0) + 1;
-          });
-        }
-      });
+      // Additional tag analytics (removed subjects as they are now tags)
 
       // Tag analytics
       const tagCounts: Record<string, number> = {};
@@ -296,7 +282,7 @@ export class MediaAccessControl {
         byVisibility,
         byYear,
         byType,
-        bySubject: subjectCounts,
+
         topTags,
         myUploads
       };
@@ -330,7 +316,7 @@ export class MediaAccessControl {
           m.filename LIKE '%${searchParams.text}%' 
           OR m.originalFilename LIKE '%${searchParams.text}%'
           OR m.tags LIKE '%${searchParams.text}%'
-          OR m.subjects LIKE '%${searchParams.text}%'
+
         )`;
       }
 
@@ -499,7 +485,7 @@ export function createUserPermissions(
     guest: {
       role: 'guest',
       permissions: {
-        canView: ['public'],
+        canView: [], // Guests have zero visibility
         canUpload: false,
         canTag: false,
         canShare: [],

@@ -3,7 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Camera, MapPin, User, Play } from 'lucide-react';
+import { Calendar, Camera, MapPin, Play } from 'lucide-react';
 import { MediaMetadata } from '@/types/media';
 import { format } from 'date-fns';
 import { getPublicUrl } from '@/lib/r2';
@@ -98,20 +98,19 @@ export function PhotoCard({ media, onClick, priority = false }: PhotoCardProps) 
           )}
         </div>
 
-        {/* Subjects (bottom-left) */}
-        {media.subjects.length > 0 && (
+        {/* Tags (bottom-left) */}
+        {media.tags.length > 0 && (
           <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             <div className="flex items-center gap-1">
-              <User className="h-3 w-3 text-white" />
               <div className="flex gap-1">
-                {media.subjects.slice(0, 2).map((subject) => (
-                  <Badge key={subject} variant="secondary" className="text-xs px-1 py-0 bg-white/90 text-black">
-                    {subject}
+                {media.tags.slice(0, 2).map((tag) => (
+                  <Badge key={tag} variant="secondary" className="text-xs px-1 py-0 bg-white/90 text-black">
+                    {tag}
                   </Badge>
                 ))}
-                {media.subjects.length > 2 && (
+                {media.tags.length > 2 && (
                   <Badge variant="secondary" className="text-xs px-1 py-0 bg-white/90 text-black">
-                    +{media.subjects.length - 2}
+                    +{media.tags.length - 2}
                   </Badge>
                 )}
               </div>

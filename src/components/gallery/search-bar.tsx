@@ -14,7 +14,7 @@ interface SearchBarProps {
 export function SearchBar({ 
   allMedia, 
   onSearchResults, 
-  placeholder = "Search photos by subject, filename, camera...",
+  placeholder = "Search photos by tags, filename, camera...",
   className 
 }: SearchBarProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,9 +29,9 @@ export function SearchBar({
 
       const query = searchQuery.toLowerCase().trim();
       const filtered = allMedia.filter(media => {
-        // Search in subjects
-        const subjectsMatch = media.subjects?.some(subject => 
-          subject.toLowerCase().includes(query)
+        // Search in tags  
+        const tagsMatch1 = media.tags?.some(tag => 
+          tag.toLowerCase().includes(query)
         );
         
         // Search in filename
@@ -52,7 +52,7 @@ export function SearchBar({
           media.metadata.exif.software?.toLowerCase().includes(query)
         );
 
-        return subjectsMatch || filenameMatch || cameraMatch || tagsMatch || exifMatch;
+        return tagsMatch1 || filenameMatch || cameraMatch || tagsMatch || exifMatch;
       });
 
       onSearchResults(filtered);
@@ -89,7 +89,7 @@ export function SearchBar({
       {/* Search hints */}
       {searchQuery && (
         <div className="absolute top-full left-0 right-0 mt-1 p-2 bg-popover border rounded-lg shadow-md text-xs text-muted-foreground z-10">
-          <div>Search includes: subjects, filenames, camera info, and tags</div>
+          <div>Search includes: filenames, camera info, and tags</div>
         </div>
       )}
     </div>

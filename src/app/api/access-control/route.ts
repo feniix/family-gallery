@@ -73,7 +73,6 @@ export async function POST(request: NextRequest) {
 async function handleGetAccessibleMedia(userId: string, searchParams: URLSearchParams) {
   const role = searchParams.get('role') as UserPermissions['role'] || 'family';
   const tags = searchParams.get('tags')?.split(',').filter(Boolean);
-  const subjects = searchParams.get('subjects')?.split(',').filter(Boolean);
   const visibility = searchParams.get('visibility')?.split(',').filter(Boolean);
   const search = searchParams.get('search') || undefined;
   
@@ -93,7 +92,6 @@ async function handleGetAccessibleMedia(userId: string, searchParams: URLSearchP
     })),
     {
       tags,
-      subjects,
       dateRange,
       visibility,
       search

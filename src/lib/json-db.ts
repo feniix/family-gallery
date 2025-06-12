@@ -194,7 +194,7 @@ export async function withRetry<T>(
 import type { UsersData, ConfigData, MediaYearData, MediaIndex, MediaMetadata } from '@/types/media';
 
 export const usersDb = createJsonDb<UsersData>('users.json', { users: {} });
-export const configDb = createJsonDb<ConfigData>('config.json', { subjects: ['rufina', 'bernabe'], tags: [] });
+export const configDb = createJsonDb<ConfigData>('config.json', { tags: [] });
 
 /**
  * Media index to track which years have data

@@ -89,7 +89,7 @@ export async function processMediaMetadata(
       ...(exifData?.pixelXDimension && { width: exifData.pixelXDimension }),
       ...(exifData?.pixelYDimension && { height: exifData.pixelYDimension }),
     },
-    subjects: [], // Will be populated by admin during upload
+
     tags: [], // Will be populated by admin during upload
     // File processing flags
     isScreenshot: isScreenshotFile,
@@ -248,7 +248,6 @@ function sanitizeMetadata(metadata: MediaMetadata): MediaMetadata {
   }
   
   // Ensure arrays are valid
-  sanitized.subjects = Array.isArray(sanitized.subjects) ? sanitized.subjects : [];
   sanitized.tags = Array.isArray(sanitized.tags) ? sanitized.tags : [];
   
   return sanitized;

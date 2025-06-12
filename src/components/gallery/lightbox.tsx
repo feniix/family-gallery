@@ -5,10 +5,11 @@ import Image from 'next/image';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, ChevronLeft, ChevronRight, Calendar, Camera, MapPin, User, Download } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Calendar, Camera, MapPin, Download } from 'lucide-react';
 import { MediaMetadata } from '@/types/media';
 import { format } from 'date-fns';
 import { getPublicUrl } from '@/lib/r2';
+import { getVideoMimeType } from '@/lib/video-processing';
 
 interface LightboxProps {
   media: MediaMetadata | null;
@@ -87,8 +88,12 @@ export function Lightbox({
                   controls
                   className="max-w-full max-h-full object-contain"
                   preload="metadata"
+                  poster={media.thumbnailPath ? getPublicUrl(media.thumbnailPath) : undefined}
                 >
+                  <source src={imageUrl} type={getVideoMimeType(media.originalFilename)} />
+                  {/* Fallback sources for better compatibility */}
                   <source src={imageUrl} type="video/mp4" />
+                  <source src={imageUrl} type="video/webm" />
                   Your browser does not support the video tag.
                 </video>
               </div>
@@ -144,14 +149,8 @@ export function Lightbox({
                 </div>
               </div>
 
-              {/* Subjects and Tags */}
+              {/* Tags */}
               <div className="flex flex-wrap gap-2">
-                {media.subjects.map((subject) => (
-                  <Badge key={subject} variant="secondary" className="flex items-center gap-1">
-                    <User className="h-3 w-3" />
-                    {subject}
-                  </Badge>
-                ))}
                 {media.tags.map((tag) => (
                   <Badge key={tag} variant="outline" className="border-white/30 text-white">
                     {tag}

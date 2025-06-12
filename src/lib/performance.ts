@@ -4,6 +4,7 @@
  */
 
 import { MediaMetadata } from '@/types/media';
+import { dbLogger } from './logger'
 
 /**
  * Virtual scrolling configuration
@@ -54,7 +55,11 @@ export class PerformanceMonitor {
     const endTime = performance.now();
     const duration = endTime - startTime;
     
-    console.log(`Performance: ${operation} took ${duration.toFixed(2)}ms`);
+    dbLogger.info('Performance measurement', { 
+      operation, 
+      duration: Number(duration.toFixed(2)),
+      unit: 'ms'
+    });
     
     this.performanceEntries.push({
       name: operation,
@@ -174,7 +179,7 @@ export class MediaMemoryManager {
         };
         
         img.onerror = () => {
-          console.warn(`Failed to preload image: ${media.id}`);
+          dbLogger.warn('Failed to preload image', { mediaId: media.id });
         };
       }
     });

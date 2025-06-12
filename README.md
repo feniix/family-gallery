@@ -6,10 +6,11 @@ A modern, cost-effective family photo and video gallery application built with N
 
 ### Core Functionality
 - **Secure Authentication**: Clerk integration with Google/Facebook OAuth
+- **5-Tier User Management**: Admin → Family → Extended-family → Friend → Guest access levels
 - **Smart Upload System**: Drag-and-drop with EXIF processing and duplicate detection
 - **Timeline Organization**: Chronological photo organization by EXIF creation date
 - **Enhanced Lightbox**: PhotoSwipe-powered viewing with zoom, pan, and navigation
-- **Video Support**: Client-side thumbnail generation and video playback
+- **Video Support**: Client-side thumbnail generation and video playbook
 - **Subject Filtering**: Tag-based filtering system (Rufina/Bernabe + extensible)
 - **Performance Optimization**: Virtual scrolling and memory management for large datasets
 
@@ -21,9 +22,16 @@ A modern, cost-effective family photo and video gallery application built with N
 - **Bulk Operations**: Mass permission updates for multiple media items
 - **Analytics Dashboard**: Real-time insights into access patterns and permission usage
 
+### 🔐 **User Management System**
+- **Automatic Guest Assignment**: New users start as guests with zero access
+- **Admin Approval Workflow**: Admins review and approve/promote users through web interface
+- **Role-Based Access**: Family members see family content, extended family sees extended content, friends see public only
+- **User Status Management**: Pending → Approved → Suspended user states
+- **Zero Access for Guests**: Guests have no content visibility until promoted
+
 ### Admin Features
 - **Upload Management**: Multi-file upload with progress tracking
-- **User Management**: Role-based access control and permission management
+- **User Management**: 5-tier role management with approval workflow
 - **Analytics Dashboard**: Upload statistics, user activity, and system monitoring
 - **Access Control Panel**: Advanced permission management with SQL-like filtering
 - **Bulk Operations**: Efficient mass updates for media permissions
@@ -106,6 +114,12 @@ UPLOAD_MAX_FILES=50
 
 ## 📖 Usage
 
+### For New Users
+1. **Sign Up**: Use Google/Facebook OAuth to create account
+2. **Pending Approval**: Start as guest with zero access, wait for admin approval
+3. **Get Promoted**: Admin promotes you to appropriate role (family/extended-family/friend)
+4. **Access Content**: View content based on your assigned role level
+
 ### For Family Members
 1. **Sign In**: Use Google/Facebook OAuth to access the gallery
 2. **Browse Photos**: Timeline and grid views with infinite scroll
@@ -115,10 +129,20 @@ UPLOAD_MAX_FILES=50
 
 ### For Admins
 1. **Upload Media**: Drag-and-drop interface with progress tracking
-2. **Manage Users**: Assign roles and custom permissions
+2. **Manage Users**: Review pending users, approve and assign roles
 3. **Access Control**: Use SQL-like queries for complex filtering
 4. **Bulk Operations**: Mass updates for media permissions
 5. **Analytics**: Monitor usage patterns and system health
+
+### User Management Flow
+1. **New User Registration**: Automatically assigned to guest role with pending status
+2. **Admin Review**: Admins see pending users in dashboard user management section
+3. **Approval Options**:
+   - **Approve as Guest**: User approved but maintains zero access
+   - **Promote to Family**: Full family content access
+   - **Promote to Extended-family**: Extended family content access
+   - **Promote to Friend**: Public content access only
+4. **Ongoing Management**: Change roles, suspend users as needed
 
 ### Advanced Search Examples
 
@@ -143,14 +167,23 @@ AND metadata->>'size' > 5000000
 src/
 ├── app/                    # Next.js App Router
 │   ├── admin/             # Admin interfaces
+│   │   ├── dashboard/     # User management and analytics
+│   │   └── upload/        # Media upload interface
 │   ├── api/               # API routes
+│   │   ├── admin/users/   # User management endpoints
+│   │   └── access-control/ # Permission management
+│   ├── pending-approval/  # Pending approval page
 │   └── gallery/           # Gallery interface
 ├── components/            # React components
 │   ├── admin/             # Admin components
+│   │   ├── user-management-panel.tsx # User approval interface
+│   │   └── access-control-panel.tsx  # Permission management
 │   ├── gallery/           # Gallery components
 │   └── ui/                # Shadcn/ui components
 ├── lib/                   # Utility libraries
 │   ├── access-control.ts  # AlaSQL access control system
+│   ├── users.ts           # User management utilities
+│   ├── server-auth.ts     # Server-side authentication
 │   ├── json-db.ts         # JSON database operations
 │   ├── exif.ts            # EXIF processing
 │   └── [18 more utilities]
@@ -179,6 +212,9 @@ yarn type-check
 
 # Linting
 yarn lint
+
+# Build verification
+yarn build
 ```
 
 ## 📊 Performance
@@ -198,7 +234,8 @@ yarn lint
 ## 🔒 Security
 
 ### Access Control
-- **Hierarchical Permissions**: 5-tier visibility system
+- **Hierarchical Permissions**: 5-tier visibility system with zero access for guests
+- **Admin Approval Workflow**: All users must be approved by administrators
 - **Tag-based Restrictions**: Granular content access control
 - **Server-side Validation**: All permissions enforced server-side
 - **Audit Logging**: Track access patterns and permission changes
@@ -210,6 +247,12 @@ yarn lint
 - **Atomic Operations**: Prevent data corruption during updates
 
 ## 📈 Analytics
+
+### User Management Insights
+- **Pending Users**: Track users waiting for approval
+- **Role Distribution**: Monitor user assignments across tiers
+- **Access Patterns**: Analyze content visibility and usage
+- **Approval Metrics**: Track admin approval workflows
 
 ### Access Control Insights
 - **Permission Usage**: Track which users access what content

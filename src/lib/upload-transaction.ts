@@ -240,7 +240,7 @@ export class UploadTransactionManager {
              size: result.metadata.size,
              hash: fileHash,
            },
-           subjects: [],
+
            tags: [],
          };
          thumbnailBlob = result.thumbnail;

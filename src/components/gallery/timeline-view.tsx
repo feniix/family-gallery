@@ -14,6 +14,7 @@ import {
   MediaMemoryManager, 
   getLoadingStrategy 
 } from '@/lib/performance';
+import { dbLogger } from '@/lib/logger'
 
 interface TimelineViewProps {
   onMediaUpdate?: (media: MediaMetadata[]) => void;
@@ -119,7 +120,9 @@ export function TimelineView({
     const checkMemory = () => {
       const memoryCheck = performanceMonitor.current!.checkMemoryUsage();
       if (memoryCheck.needsCleanup && memoryManager.current) {
-        console.warn('High memory usage detected, triggering cleanup');
+        dbLogger.warn('High memory usage detected, triggering cleanup', {
+          memoryUsage: memoryCheck.usage
+        });
         memoryManager.current.clearCache();
       }
     };
