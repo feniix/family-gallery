@@ -34,33 +34,45 @@ export function EnhancedLightbox({
   useEffect(() => {
     if (!isOpen || !pswpRef.current) return;
 
-    // Prepare PhotoSwipe items
-    const items = allMedia.map((item) => {
-      if (item.type === 'video') {
-        // For videos, we'll use the thumbnail for PhotoSwipe
-        return {
-          src: `/api/media/download/${item.id}/thumbnail`,
-          width: item.metadata?.width || 800,
-          height: item.metadata?.height || 600,
-          alt: item.originalFilename,
-          isVideo: true,
-          videoData: item
-        };
-      } else {
+    // Don't initialize PhotoSwipe if current media is a video
+    if (media?.type === 'video') return;
+
+    // Prepare PhotoSwipe items - only include images
+    const items = allMedia
+      .filter(item => item.type !== 'video') // Only images for PhotoSwipe
+      .map((item) => {
+        // Get actual dimensions or calculate proper fallback maintaining aspect ratio
+        let width = item.metadata?.width;
+        let height = item.metadata?.height;
+        
+        // If dimensions are missing, use a reasonable fallback that maintains common aspect ratios
+        if (!width || !height) {
+          // Most common photo aspect ratios: 4:3, 3:2, 16:9
+          width = 1200;
+          height = 1600; // Default to portrait 3:4 ratio (common for phone photos)
+        }
+        
         return {
           src: `/api/media/download/${item.id}`,
-          width: item.metadata?.width || 800,
-          height: item.metadata?.height || 600,
+          width,
+          height,
           alt: item.originalFilename,
           isVideo: false,
           mediaData: item
         };
-      }
-    });
+      });
+
+    // Find the correct index for images only
+    const imageOnlyIndex = allMedia
+      .filter(item => item.type !== 'video')
+      .findIndex(item => item.id === media?.id);
+    
+    // If current media is not found in images, don't initialize PhotoSwipe
+    if (imageOnlyIndex === -1) return;
 
     const options = {
       dataSource: items,
-      index: currentIndex,
+      index: imageOnlyIndex,
       bgOpacity: 0.9,
       spacing: 0.1,
       allowPanToNext: true,
@@ -70,21 +82,65 @@ export function EnhancedLightbox({
       padding: { top: 60, bottom: 60, left: 40, right: 40 },
       preloadFirstSlide: true,
       loop: false,
+      // Add options to help with aspect ratio preservation
+      showHideAnimationType: 'fade' as const,
+      zoomAnimationDuration: 300
     };
 
+    console.log('PhotoSwipe items:', items.map(item => ({ 
+      src: item.src, 
+      width: item.width, 
+      height: item.height,
+      aspectRatio: item.width / item.height
+    })));
+
     pswpInstanceRef.current = new PhotoSwipe(options);
+    
+    // Debug: Log PhotoSwipe initialization
+    pswpInstanceRef.current.on('beforeOpen', () => {
+      console.log('PhotoSwipe opening');
+    });
+
+    pswpInstanceRef.current.on('afterInit', () => {
+      const pswp = pswpInstanceRef.current;
+      if (pswp && pswp.currSlide) {
+        console.log('PhotoSwipe initialized with slide:', {
+          width: pswp.currSlide.width,
+          height: pswp.currSlide.height,
+          zoomLevels: pswp.currSlide.zoomLevels,
+          viewportSize: pswp.viewportSize
+        });
+      }
+    });
+
+    pswpInstanceRef.current.on('resize', () => {
+      const pswp = pswpInstanceRef.current;
+      if (pswp && pswp.currSlide) {
+        console.log('PhotoSwipe resized:', {
+          slideWidth: pswp.currSlide.width,
+          slideHeight: pswp.currSlide.height,
+          viewportSize: pswp.viewportSize
+        });
+      }
+    });
     
     // Handle slide change
     pswpInstanceRef.current.on('change', () => {
       const pswp = pswpInstanceRef.current;
       if (!pswp) return;
       
-      const newIndex = pswp.currIndex;
-      if (newIndex !== currentIndex) {
-        if (newIndex > currentIndex) {
-          onNext();
-        } else {
-          onPrevious();
+      const newImageIndex = pswp.currIndex;
+      const selectedImageMedia = items[newImageIndex]?.mediaData;
+      
+      if (selectedImageMedia) {
+        // Find the original index in allMedia array
+        const originalIndex = allMedia.findIndex(item => item.id === selectedImageMedia.id);
+        if (originalIndex !== -1 && originalIndex !== currentIndex) {
+          if (originalIndex > currentIndex) {
+            onNext();
+          } else {
+            onPrevious();
+          }
         }
       }
     });
@@ -103,25 +159,7 @@ export function EnhancedLightbox({
         pswpInstanceRef.current = null;
       }
     };
-  }, [isOpen, currentIndex, allMedia, onNext, onPrevious, onClose]);
-
-  // Hide PhotoSwipe when video is playing to prevent interference
-  useEffect(() => {
-    if (!pswpInstanceRef.current) return;
-    
-    const pswpElement = pswpRef.current;
-    if (!pswpElement) return;
-    
-    if (media?.type === 'video') {
-      // Hide PhotoSwipe UI to prevent interference with video controls
-      pswpElement.style.visibility = 'hidden';
-      pswpElement.style.pointerEvents = 'none';
-    } else {
-      // Show PhotoSwipe UI for images
-      pswpElement.style.visibility = 'visible';
-      pswpElement.style.pointerEvents = 'auto';
-    }
-  }, [media?.type]);
+  }, [isOpen, currentIndex, allMedia, onNext, onPrevious, onClose, media?.type, media?.id]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -149,14 +187,15 @@ export function EnhancedLightbox({
 
   return (
     <>
-      {/* PhotoSwipe container - hide when video is displayed */}
-      <div 
-        ref={pswpRef}
-        className={`pswp ${media?.type === 'video' ? 'hidden' : ''}`}
-        tabIndex={-1} 
-        role="dialog" 
-        aria-hidden="true"
-      >
+      {/* PhotoSwipe container - only render for images */}
+      {media?.type !== 'video' && (
+        <div 
+          ref={pswpRef}
+          className="pswp"
+          tabIndex={-1} 
+          role="dialog" 
+          aria-hidden="true"
+        >
         <div className="pswp__bg"></div>
         <div className="pswp__scroll-wrap">
           <div className="pswp__container">
@@ -190,9 +229,11 @@ export function EnhancedLightbox({
           </div>
         </div>
       </div>
+      )}
 
-      {/* Custom metadata overlay - hide when video is displayed */}
-      <div className={`pswp__metadata fixed bottom-4 left-4 right-4 bg-black/80 backdrop-blur-sm text-white p-4 rounded-lg z-[2000] ${media?.type === 'video' ? 'hidden' : ''}`}>
+      {/* Custom metadata overlay - only for images */}
+      {media?.type !== 'video' && (
+        <div className="pswp__metadata fixed bottom-4 left-4 right-4 bg-black/80 backdrop-blur-sm text-white p-4 rounded-lg z-[2000]">
         {media && (
           <div className="space-y-2 text-sm">
             <div className="font-semibold">{media.originalFilename}</div>
@@ -217,6 +258,7 @@ export function EnhancedLightbox({
           </div>
         )}
       </div>
+      )}
 
       {/* Video player overlay for video files */}
       {media?.type === 'video' && (

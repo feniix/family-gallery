@@ -35,12 +35,75 @@ interface BulkUploadZoneProps {
 }
 
 interface UploadState {
-  files: UploadFile[];
+  files: ExtendedUploadFile[];
   isUploading: boolean;
   selectedTags: string[];
   newTag: string;
   showTagDialog: boolean;
   overallProgress: number;
+}
+
+// Extended UploadFile interface to include image thumbnail
+interface ExtendedUploadFile extends UploadFile {
+  // Image thumbnail
+  imageThumbnail?: Blob | null;
+}
+
+/**
+ * Generate thumbnail from image file
+ */
+async function generateImageThumbnail(
+  imageFile: File,
+  options: { width?: number; height?: number; quality?: number } = {}
+): Promise<Blob | null> {
+  const { width = 320, height = 240, quality = 0.8 } = options;
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      resolve(null);
+      return;
+    }
+
+    img.onload = () => {
+      // Calculate dimensions maintaining aspect ratio
+      const aspectRatio = img.width / img.height;
+      let canvasWidth = width;
+      let canvasHeight = height;
+
+      if (aspectRatio > 1) {
+        canvasHeight = canvasWidth / aspectRatio;
+      } else {
+        canvasWidth = canvasHeight * aspectRatio;
+      }
+
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+
+      // Draw image to canvas
+      ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+
+      // Convert to blob
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(img.src);
+          resolve(blob);
+        },
+        'image/jpeg',
+        quality
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src);
+      resolve(null);
+    };
+
+    img.src = URL.createObjectURL(imageFile);
+  });
 }
 
 export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }: BulkUploadZoneProps) {
@@ -89,7 +152,7 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
     }
 
     // Create upload file objects
-    const uploadFiles: UploadFile[] = validFiles.map(file => ({
+    const uploadFiles: ExtendedUploadFile[] = validFiles.map(file => ({
       id: self.crypto?.randomUUID?.() || Math.random().toString(36).substring(2) + Date.now().toString(36),
       file,
       status: 'pending',
@@ -101,19 +164,30 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
       files: [...prev.files, ...uploadFiles]
     }));
 
-    // Extract EXIF data for images and generate thumbnails for videos
+    // Extract EXIF data for images and generate thumbnails for both images and videos
     for (const uploadFile of uploadFiles) {
       if (uploadFile.file.type.startsWith('image/')) {
         try {
           const exifData = await extractExifMetadata(uploadFile.file);
+          console.log('Generating thumbnail for:', uploadFile.file.name);
+          const imageThumbnail = await generateImageThumbnail(uploadFile.file, {
+            width: 320,
+            height: 240,
+            quality: 0.8
+          });
+          console.log('Thumbnail generated:', {
+            filename: uploadFile.file.name,
+            thumbnailSize: imageThumbnail?.size || 0,
+            thumbnailExists: !!imageThumbnail
+          });
           setState(prev => ({
             ...prev,
             files: prev.files.map(f => 
-              f.id === uploadFile.id ? { ...f, exifData } : f
+              f.id === uploadFile.id ? { ...f, exifData, imageThumbnail } : f
             )
           }));
         } catch (error) {
-          console.error('EXIF extraction failed:', error);
+          console.error('EXIF extraction or thumbnail generation failed:', error);
         }
       } else if (uploadFile.file.type.startsWith('video/')) {
         try {
@@ -274,13 +348,17 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
           result = await videoUploadResponse.json();
         } else {
 
-          // Regular upload for images
-          const takenAt = uploadFile.exifData?.dateTimeOriginal?.toISOString() ||
-                          uploadFile.exifData?.dateTime?.toISOString() ||
-                          new Date().toISOString();
+          // Regular upload for images - use proper metadata processing
+          const { processMediaMetadata } = await import('@/lib/metadata');
+          const { metadata: processedMetadata, fileNaming, hash } = await processMediaMetadata(
+            uploadFile.file, 
+            userId || 'unknown', 
+            'web', 
+            uploadFile.exifData
+          );
 
 
-          // Get presigned URL
+          // Get presigned URL using the properly processed takenAt date
           const presignedResponse = await fetch('/api/upload/presigned', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -288,7 +366,7 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
               filename: uploadFile.file.name,
               contentType: uploadFile.file.type,
               fileSize: uploadFile.file.size,
-              takenAt
+              takenAt: processedMetadata.takenAt
             })
           });
 
@@ -311,6 +389,45 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
             throw new Error(`Upload to R2 failed: ${uploadResponse.status} - ${errorText}`);
           }
 
+          // Upload thumbnail if generated
+          if (uploadFile.imageThumbnail && fileNaming.thumbnailPath) {
+            try {
+              console.log('Uploading thumbnail:', {
+                thumbnailPath: fileNaming.thumbnailPath,
+                thumbnailSize: uploadFile.imageThumbnail.size,
+                originalFilename: uploadFile.file.name
+              });
+              
+              const { generatePresignedUploadUrl } = await import('@/lib/r2');
+              const thumbnailPresignedUrl = await generatePresignedUploadUrl(fileNaming.thumbnailPath, 'image/jpeg');
+              
+              const thumbnailUploadResponse = await fetch(thumbnailPresignedUrl, {
+                method: 'PUT',
+                body: uploadFile.imageThumbnail,
+                headers: { 'Content-Type': 'image/jpeg' }
+              });
+              
+              if (!thumbnailUploadResponse.ok) {
+                console.warn('Thumbnail upload failed:', {
+                  status: thumbnailUploadResponse.status,
+                  statusText: thumbnailUploadResponse.statusText,
+                  thumbnailPath: fileNaming.thumbnailPath
+                });
+              } else {
+                console.log('Thumbnail uploaded successfully:', fileNaming.thumbnailPath);
+              }
+            } catch (thumbnailError) {
+              console.warn('Thumbnail upload failed:', thumbnailError);
+            }
+          } else {
+            console.log('No thumbnail to upload:', {
+              hasThumbnail: !!uploadFile.imageThumbnail,
+              thumbnailSize: uploadFile.imageThumbnail?.size,
+              hasThumbnailPath: !!fileNaming.thumbnailPath,
+              thumbnailPath: fileNaming.thumbnailPath,
+              originalFilename: uploadFile.file.name
+            });
+          }
 
           // Update to processing
           setState(prev => ({
@@ -323,39 +440,17 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
           // Generate a unique ID for the media
           const mediaId = self.crypto?.randomUUID?.() || Math.random().toString(36).substring(2) + Date.now().toString(36);
           
-          // Create metadata with selected tags
+          // Create metadata using the properly processed metadata with selected tags
           const mediaMetadata: MediaMetadata = {
+            ...processedMetadata,
             id: mediaId,
-            filename: uploadFile.file.name.replace(/[^a-zA-Z0-9.-]/g, '_'),
-            originalFilename: uploadFile.file.name,
             path: filePath,
-            type: 'photo',
-            uploadedBy: userId || 'unknown',
-            uploadedAt: new Date().toISOString(),
-            uploadSource: 'web',
-            takenAt,
-            dateInfo: {
-              source: uploadFile.exifData?.dateTimeOriginal ? 'exif' : 'upload-time',
-              confidence: uploadFile.exifData?.dateTimeOriginal ? 'high' : 'low'
-            },
-            metadata: {
-              size: uploadFile.file.size,
-              hash: 'pending',
-              ...(uploadFile.exifData && { exif: uploadFile.exifData }),
-              ...(uploadFile.exifData?.gps && {
-                location: {
-                  lat: uploadFile.exifData.gps.latitude,
-                  lng: uploadFile.exifData.gps.longitude
-                }
-              }),
-              ...(uploadFile.exifData?.make && uploadFile.exifData?.model && {
-                camera: `${uploadFile.exifData.make} ${uploadFile.exifData.model}`
-              }),
-              ...(uploadFile.exifData?.pixelXDimension && { width: uploadFile.exifData.pixelXDimension }),
-              ...(uploadFile.exifData?.pixelYDimension && { height: uploadFile.exifData.pixelYDimension })
-            },
+            thumbnailPath: fileNaming.thumbnailPath,
             tags: state.selectedTags,
-            hasValidExif: !!uploadFile.exifData
+            metadata: {
+              ...processedMetadata.metadata,
+              hash
+            }
           };
 
 
@@ -458,7 +553,7 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
     return <FileIcon className="h-4 w-4 text-gray-500" />;
   };
 
-  const getStatusIcon = (status: UploadFile['status']) => {
+  const getStatusIcon = (status: ExtendedUploadFile['status']) => {
     switch (status) {
       case 'completed':
         return <CheckCircle className="h-4 w-4 text-green-500" />;

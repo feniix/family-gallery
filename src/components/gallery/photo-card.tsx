@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, Camera, MapPin, Play } from 'lucide-react';
 import { MediaMetadata } from '@/types/media';
 import { format } from 'date-fns';
-import { getPublicUrl } from '@/lib/r2';
 
 interface PhotoCardProps {
   media: MediaMetadata;
@@ -15,7 +14,10 @@ interface PhotoCardProps {
 }
 
 export function PhotoCard({ media, onClick, priority = false }: PhotoCardProps) {
-  const imageUrl = getPublicUrl(media.thumbnailPath || media.path);
+  // Use API endpoint for thumbnails to enable fallback to original image
+  const imageUrl = media.thumbnailPath 
+    ? `/api/media/download/${media.id}/thumbnail`
+    : `/api/media/download/${media.id}`;
   const isVideo = media.type === 'video';
   const hasVideoThumbnail = isVideo && media.thumbnailPath;
 

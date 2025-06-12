@@ -129,6 +129,82 @@ export async function GET(
       return new NextResponse(combined, { headers });
 
     } catch (storageError) {
+      // If thumbnail request failed, try to serve the original image as fallback
+      if (isThumbnail && mediaItem.thumbnailPath && mediaItem.path !== mediaItem.thumbnailPath) {
+        apiLogger.info('Thumbnail not found, attempting fallback to original image', {
+          mediaId: id,
+          thumbnailPath: mediaItem.thumbnailPath,
+          originalPath: mediaItem.path
+        });
+        
+        try {
+          // Try to get the original file instead
+          if (!r2Client) {
+            throw new Error('Storage client not available for fallback');
+          }
+          
+          const fallbackCommand = new GetObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME!,
+            Key: mediaItem.path,
+          });
+          
+          const fallbackResponse = await r2Client.send(fallbackCommand);
+          
+          if (fallbackResponse.Body) {
+            // Convert the readable stream to array buffer
+            const chunks: Uint8Array[] = [];
+            const reader = fallbackResponse.Body.transformToWebStream().getReader();
+            
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+              }
+            } finally {
+              reader.releaseLock();
+            }
+
+            // Combine chunks into a single array buffer
+            const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+            const combined = new Uint8Array(totalLength);
+            let offset = 0;
+            for (const chunk of chunks) {
+              combined.set(chunk, offset);
+              offset += chunk.length;
+            }
+
+            // Determine content type (original image, not thumbnail)
+            const contentType = getContentType(mediaItem.type, mediaItem.originalFilename, false);
+
+            // Set appropriate headers
+            const headers = new Headers({
+              'Content-Type': contentType,
+              'Content-Length': combined.length.toString(),
+              'Cache-Control': 'public, max-age=31536000', // Cache for 1 year
+            });
+
+            apiLogger.info('Fallback to original image served', {
+              mediaId: id,
+              filename: mediaItem.originalFilename,
+              fileSize: combined.length,
+              originallyRequestedThumbnail: true,
+              userId
+            });
+
+            return new NextResponse(combined, { headers });
+          }
+        } catch (fallbackError) {
+          apiLogger.error('Both thumbnail and original file not found', {
+            mediaId: id,
+            thumbnailPath: mediaItem.thumbnailPath,
+            originalPath: mediaItem.path,
+            thumbnailError: storageError instanceof Error ? storageError.message : storageError,
+            fallbackError: fallbackError instanceof Error ? fallbackError.message : fallbackError
+          });
+        }
+      }
+      
       apiLogger.error('Error retrieving file from storage', {
         mediaId: id,
         filePath,
