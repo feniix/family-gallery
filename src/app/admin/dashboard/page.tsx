@@ -18,7 +18,9 @@ import {
   CheckCircle,
   Settings,
   Activity,
-  HardDrive
+  HardDrive,
+  Folder,
+  FolderTree
 } from 'lucide-react'
 import { toast } from 'sonner'
 import UserManagementPanel from '@/components/admin/user-management-panel'
@@ -152,8 +154,14 @@ export default function AdminDashboardPage() {
           </div>
           <div className="flex space-x-2">
             <Button asChild variant="outline" size="sm">
+              <a href="/admin/user-manager">
+                <Users className="h-4 w-4 mr-2" />
+                User Manager
+              </a>
+            </Button>
+            <Button asChild variant="outline" size="sm">
               <a href="/admin/media-manager">
-                <Settings className="h-4 w-4 mr-2" />
+                <FolderTree className="h-4 w-4 mr-2" />
                 Media Manager
               </a>
             </Button>

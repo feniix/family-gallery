@@ -215,9 +215,43 @@ export async function checkUserHasAccessSmart(authResult?: { userId: string | nu
       authLogger.debug('No user data found in database')
       
       // User is not in database yet (first time)
-      // Check if they are an admin by email so webhook can auto-approve them
-      // This is a fallback check before the webhook creates the user
-      authLogger.warn('User not in database - webhook should create admin users automatically on signup')
+      // Try to create the user automatically
+      try {
+        const user = await currentUser()
+        if (user?.primaryEmailAddress?.emailAddress) {
+          const { createUser } = await import('@/lib/users')
+          const { usersDb, withRetry } = await import('@/lib/json-db')
+          
+          const newUser = createUser({
+            id: userId,
+            email: user.primaryEmailAddress.emailAddress,
+            name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.primaryEmailAddress.emailAddress.split('@')[0],
+            provider: 'clerk'
+          })
+          
+          // Add to database
+          const usersData = await withRetry(() => usersDb.read())
+          usersData.users[userId] = newUser
+          await withRetry(() => usersDb.write(usersData))
+          
+          authLogger.info('Auto-created user in database', {
+            userId,
+            email: user.primaryEmailAddress.emailAddress,
+            role: newUser.role,
+            status: newUser.status
+          })
+          
+          // Return access based on the newly created user
+          if (newUser.role === 'admin') {
+            return true
+          }
+          return newUser.status === 'approved'
+        }
+      } catch (error) {
+        authLogger.error('Failed to auto-create user', { error })
+      }
+      
+      authLogger.warn('User not in database and auto-creation failed')
     }
   } catch (error) {
     authLogger.error('Database error during access check', { error })

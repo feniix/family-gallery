@@ -59,7 +59,10 @@ export async function POST() {
       user: newUserData
     })
   } catch (error) {
-    authLogger.error('Error auto-creating admin user', { error })
+    authLogger.error('Error auto-creating admin user', { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    })
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

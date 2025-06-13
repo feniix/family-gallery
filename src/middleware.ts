@@ -11,6 +11,8 @@ const isPublicRoute = createRouteMatcher([
   '/pending-approval', // Allow access to pending approval page
   '/api/webhooks/(.*)', // Allow access to webhook endpoints
   '/api/auto-create-admin', // Allow access to auto-create-admin endpoint
+  '/api/user/status', // Allow users to check their own status
+  '/api/user/create', // Allow users to create their own database entry
   '/api/debug/cleanup-users', // Allow access to debug cleanup endpoint
 ])
 

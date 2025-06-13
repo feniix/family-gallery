@@ -45,10 +45,24 @@ export default function PendingApprovalPage() {
         // Continue with normal status check
       }
       
-      const response = await fetch(`/api/admin/users?status=all`);
+      // Try to create user in database if they don't exist
+      try {
+        const createResponse = await fetch('/api/user/create', {
+          method: 'POST',
+        });
+        if (createResponse.ok) {
+          const createData = await createResponse.json();
+          authLogger.debug('User creation result', { createData })
+        }
+      } catch (createError) {
+        authLogger.debug('Error creating user in database', { createError })
+        // Continue with status check even if creation fails
+      }
+      
+      const response = await fetch('/api/user/status');
       if (response.ok) {
         const data = await response.json();
-        const currentUser = data.users.find((u: { id: string }) => u.id === user.id);
+        const currentUser = data.user;
         if (currentUser) {
           setUserStatus({
             role: currentUser.role,
@@ -62,9 +76,17 @@ export default function PendingApprovalPage() {
             window.location.href = '/gallery';
           }
         }
+      } else {
+        authLogger.error('Failed to fetch user status', { 
+          status: response.status, 
+          statusText: response.statusText 
+        });
       }
     } catch (error) {
-      authLogger.error('Error checking user status', { error })
+      authLogger.error('Error checking user status', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      })
     } finally {
       setLoading(false);
     }

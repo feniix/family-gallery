@@ -42,16 +42,12 @@ import {
   Calendar, 
   Tags, 
   Plus, 
-  X, 
-  // ImageIcon,
-  // VideoIcon,
+  X,
   Loader2,
   CheckSquare,
   Square,
   Eye,
   Play,
-  // ExternalLink,
-  // FileIcon
 } from 'lucide-react';
 import { BulkUploadZone } from '@/components/admin/bulk-upload-zone';
 import { SimpleLightbox } from '@/components/gallery/simple-lightbox';

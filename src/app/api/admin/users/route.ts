@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     let users = Object.values(usersData.users);
 
     // Apply filters
-    if (status) {
+    if (status && status !== 'all') {
       users = users.filter(user => user.status === status);
     }
     if (role) {
@@ -56,7 +56,8 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     apiLogger.error('Error fetching users', { 
-      error: error instanceof Error ? error.message : error 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     });
     return NextResponse.json(
       { error: 'Failed to fetch users' },
@@ -108,10 +109,34 @@ export async function POST(request: NextRequest) {
         break;
       
       case 'promote':
-        if (!role || !['family', 'extended-family', 'friend'].includes(role)) {
+        if (!role || !['admin', 'family', 'extended-family', 'friend', 'guest'].includes(role)) {
           return NextResponse.json({ error: 'Invalid role for promotion' }, { status: 400 });
         }
-        updatedUser = promoteUser(targetUser, role, adminEmail);
+        
+        // Handle admin role specially since promoteUser doesn't support it
+        if (role === 'admin') {
+          updatedUser = {
+            ...targetUser,
+            role: 'admin',
+            approved: true,
+            approvedBy: adminEmail,
+            approvedAt: new Date().toISOString(),
+            status: 'approved'
+          };
+        } else if (role === 'guest') {
+          // Handle guest role - guests are approved but have no content access
+          updatedUser = {
+            ...targetUser,
+            role: 'guest',
+            approved: true,
+            approvedBy: adminEmail,
+            approvedAt: new Date().toISOString(),
+            status: 'approved'
+          };
+        } else {
+          // Use promoteUser for family, extended-family, friend
+          updatedUser = promoteUser(targetUser, role as 'family' | 'extended-family' | 'friend', adminEmail);
+        }
         break;
       
       case 'suspend':
@@ -146,7 +171,8 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     apiLogger.error('Error in user management action', { 
-      error: error instanceof Error ? error.message : error 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     });
     return NextResponse.json(
       { error: 'Failed to perform user action' },
