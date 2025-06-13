@@ -8,7 +8,7 @@ export const r2Config = {
   accessKeyId: typeof window === 'undefined' ? process.env.R2_ACCESS_KEY_ID! : '',
   secretAccessKey: typeof window === 'undefined' ? process.env.R2_SECRET_ACCESS_KEY! : '',
   bucketName: typeof window === 'undefined' ? process.env.R2_BUCKET_NAME! : '',
-  publicUrl: typeof window === 'undefined' ? process.env.R2_PUBLIC_URL! : '',
+  publicUrl: typeof window === 'undefined' ? process.env.R2_PUBLIC_URL : '', // Optional
 };
 
 // Validate R2 configuration (only on server-side, skip in test environment)
@@ -112,13 +112,14 @@ export async function deleteFromR2(key: string): Promise<void> {
 
 /**
  * Generate a public URL for an object in R2
+ * @deprecated This function is not used since the app uses authenticated API routes
  * @param key - The object key (file path) in R2
  * @returns Public URL (if bucket is public) or custom domain URL
  */
 export function getPublicUrl(key: string): string {
   const publicUrl = typeof window === 'undefined' ? r2Config.publicUrl : process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
   if (!publicUrl) {
-    throw new Error('R2 public URL not configured');
+    throw new Error('R2 public URL not configured - but this function should not be used anyway');
   }
   return `${publicUrl}/${key}`;
 }
