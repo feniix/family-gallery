@@ -36,19 +36,25 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import Image from 'next/image';
 import { 
   Trash2, 
   Calendar, 
   Tags, 
   Plus, 
   X, 
-  ImageIcon,
-  VideoIcon,
+  // ImageIcon,
+  // VideoIcon,
   Loader2,
   CheckSquare,
-  Square
+  Square,
+  Eye,
+  Play,
+  // ExternalLink,
+  // FileIcon
 } from 'lucide-react';
 import { BulkUploadZone } from '@/components/admin/bulk-upload-zone';
+import { SimpleLightbox } from '@/components/gallery/simple-lightbox';
 import type { MediaMetadata } from '@/types/media';
 import { apiLogger } from '@/lib/logger';
 
@@ -61,6 +67,9 @@ interface MediaManagerState {
   tagFilter: string[];
   selectedItems: Set<string>;
   bulkMode: boolean;
+  lightboxOpen: boolean;
+  lightboxIndex: number;
+  sortBy: 'date-newest' | 'date-oldest' | 'name-asc' | 'size-desc';
 }
 
 export default function MediaManagerPage() {
@@ -73,7 +82,10 @@ export default function MediaManagerPage() {
     searchQuery: '',
     tagFilter: [],
     selectedItems: new Set(),
-    bulkMode: false
+    bulkMode: false,
+    lightboxOpen: false,
+    lightboxIndex: 0,
+    sortBy: 'date-newest'
   });
 
   const [editDialog, setEditDialog] = useState<{
@@ -403,16 +415,71 @@ export default function MediaManagerPage() {
     setState(prev => ({ ...prev, selectedItems: new Set() }));
   };
 
-  const filteredMedia = state.media.filter(media => {
-    const matchesSearch = state.searchQuery === '' || 
-      media.originalFilename.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
-      media.tags.some(tag => tag.toLowerCase().includes(state.searchQuery.toLowerCase()));
-    
-    const matchesTags = state.tagFilter.length === 0 ||
-      state.tagFilter.every(filterTag => media.tags.includes(filterTag));
-    
-    return matchesSearch && matchesTags;
-  });
+  const filteredMedia = state.media
+    .filter(media => {
+      const matchesSearch = state.searchQuery === '' || 
+        media.originalFilename.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
+        media.tags.some(tag => tag.toLowerCase().includes(state.searchQuery.toLowerCase()));
+      
+      const matchesTags = state.tagFilter.length === 0 ||
+        state.tagFilter.every(filterTag => media.tags.includes(filterTag));
+      
+      return matchesSearch && matchesTags;
+    })
+    .sort((a, b) => {
+      switch (state.sortBy) {
+        case 'date-newest':
+          return new Date(b.takenAt).getTime() - new Date(a.takenAt).getTime();
+        case 'date-oldest':
+          return new Date(a.takenAt).getTime() - new Date(b.takenAt).getTime();
+        case 'name-asc':
+          return a.originalFilename.localeCompare(b.originalFilename);
+        case 'size-desc':
+          return (b.metadata?.size || 0) - (a.metadata?.size || 0);
+        default:
+          return 0;
+      }
+    });
+
+  const handleSortChange = (sortBy: MediaManagerState['sortBy']) => {
+    setState(prev => ({ ...prev, sortBy }));
+  };
+
+  const handleOpenLightbox = (media: MediaMetadata) => {
+    const index = filteredMedia.findIndex(m => m.id === media.id);
+    setState(prev => ({
+      ...prev,
+      lightboxOpen: true,
+      lightboxIndex: index,
+      selectedMedia: media
+    }));
+  };
+
+  const handleCloseLightbox = () => {
+    setState(prev => ({
+      ...prev,
+      lightboxOpen: false,
+      selectedMedia: null
+    }));
+  };
+
+  const handleLightboxNext = () => {
+    const nextIndex = (state.lightboxIndex + 1) % filteredMedia.length;
+    setState(prev => ({
+      ...prev,
+      lightboxIndex: nextIndex,
+      selectedMedia: filteredMedia[nextIndex]
+    }));
+  };
+
+  const handleLightboxPrevious = () => {
+    const prevIndex = state.lightboxIndex === 0 ? filteredMedia.length - 1 : state.lightboxIndex - 1;
+    setState(prev => ({
+      ...prev,
+      lightboxIndex: prevIndex,
+      selectedMedia: filteredMedia[prevIndex]
+    }));
+  };
 
   if (!isLoaded) {
     return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -645,10 +712,66 @@ export default function MediaManagerPage() {
             </CardContent>
           </Card>
 
+          {/* Media Statistics */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div>
+                  <div className="text-2xl font-bold text-blue-600">{filteredMedia.length}</div>
+                  <div className="text-xs text-muted-foreground">Total Items</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-green-600">
+                    {filteredMedia.filter(m => m.type === 'photo').length}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Photos</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-purple-600">
+                    {filteredMedia.filter(m => m.type === 'video').length}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Videos</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-orange-600">
+                    {Math.round(filteredMedia.reduce((acc, m) => acc + (m.metadata?.size || 0), 0) / 1024 / 1024 / 1024 * 100) / 100}
+                  </div>
+                  <div className="text-xs text-muted-foreground">GB Total</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Media Grid */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle>Media Items ({filteredMedia.length})</CardTitle>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    Sort: {
+                      state.sortBy === 'date-newest' ? 'Date (Newest)' :
+                      state.sortBy === 'date-oldest' ? 'Date (Oldest)' :
+                      state.sortBy === 'name-asc' ? 'Name (A-Z)' :
+                      'Size (Largest)'
+                    }
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleSortChange('date-newest')}>
+                    Date (Newest First)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleSortChange('date-oldest')}>
+                    Date (Oldest First)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleSortChange('name-asc')}>
+                    Name (A-Z)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleSortChange('size-desc')}>
+                    Size (Largest First)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </CardHeader>
             <CardContent>
               {state.loading ? (
@@ -660,35 +783,103 @@ export default function MediaManagerPage() {
                   No media found matching your criteria
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {filteredMedia.map(media => (
-                    <Card key={media.id} className="overflow-hidden">
-                      <div className="aspect-video bg-muted flex items-center justify-center relative">
+                    <Card key={media.id} className="overflow-hidden group hover:shadow-lg transition-shadow">
+                      <div className="aspect-video bg-muted relative overflow-hidden cursor-pointer" onClick={() => handleOpenLightbox(media)}>
                         {state.bulkMode && (
-                          <Checkbox
+                          <div 
                             className="absolute top-2 left-2 z-10"
-                            checked={state.selectedItems.has(media.id)}
-                            onCheckedChange={() => toggleItemSelection(media.id)}
-                          />
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Checkbox
+                              className="bg-white/80 rounded"
+                              checked={state.selectedItems.has(media.id)}
+                              onCheckedChange={() => toggleItemSelection(media.id)}
+                            />
+                          </div>
                         )}
-                        {media.type === 'photo' ? (
-                          <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                        ) : (
-                          <VideoIcon className="h-8 w-8 text-muted-foreground" />
+                        
+                                                 {/* Media Thumbnail */}
+                         {media.type === 'photo' ? (
+                           <Image
+                             src={`/api/media/download/${media.id}/thumbnail`}
+                             alt={media.originalFilename}
+                             fill
+                             className="object-cover group-hover:scale-105 transition-transform duration-200"
+                             sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                           />
+                         ) : (
+                           <Image
+                             src={`/api/media/download/${media.id}/thumbnail`}
+                             alt={media.originalFilename}
+                             fill
+                             className="object-cover group-hover:scale-105 transition-transform duration-200"
+                             sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                             onError={(e) => {
+                               // Fallback to video icon if thumbnail fails
+                               const target = e.target as HTMLImageElement;
+                               target.style.display = 'none';
+                               const parent = target.parentElement;
+                               if (parent) {
+                                 parent.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-gray-200"><svg class="h-12 w-12 text-gray-400" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>';
+                               }
+                             }}
+                           />
+                         )}
+                        
+                        {/* Overlay for video */}
+                        {media.type === 'video' && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
+                            <div className="rounded-full bg-white/90 p-3 shadow-lg group-hover:scale-110 transition-transform">
+                              <Play className="h-6 w-6 text-black fill-black" />
+                            </div>
+                          </div>
                         )}
+                        
+                        {/* Preview button */}
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-8 w-8 p-0 bg-white/90 hover:bg-white"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenLightbox(media);
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                       <CardContent className="p-4 space-y-2">
-                        <h3 className="font-medium truncate">{media.originalFilename}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(media.takenAt).toLocaleDateString()}
-                        </p>
+                        <div className="space-y-1">
+                          <h3 className="font-medium truncate text-sm">{media.originalFilename}</h3>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>{new Date(media.takenAt).toLocaleDateString()}</span>
+                            <span>{Math.round((media.metadata?.size || 0) / 1024 / 1024 * 100) / 100} MB</span>
+                          </div>
+                          {media.metadata?.width && media.metadata?.height && (
+                            <p className="text-xs text-muted-foreground">
+                              {media.metadata.width} × {media.metadata.height}
+                              {media.type === 'video' && media.metadata.duration && (
+                                <span> • {Math.round(media.metadata.duration)}s</span>
+                              )}
+                            </p>
+                          )}
+                        </div>
                         
                         <div className="flex flex-wrap gap-1">
-                          {media.tags.map(tag => (
+                          {media.tags.slice(0, 3).map(tag => (
                             <Badge key={tag} variant="secondary" className="text-xs">
                               {tag}
                             </Badge>
                           ))}
+                          {media.tags.length > 3 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{media.tags.length - 3} more
+                            </Badge>
+                          )}
                         </div>
 
                         {!state.bulkMode && (
@@ -852,6 +1043,19 @@ export default function MediaManagerPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Media Lightbox */}
+      {state.selectedMedia && (
+        <SimpleLightbox
+          media={state.selectedMedia}
+          allMedia={filteredMedia}
+          currentIndex={state.lightboxIndex}
+          isOpen={state.lightboxOpen}
+          onClose={handleCloseLightbox}
+          onNext={handleLightboxNext}
+          onPrevious={handleLightboxPrevious}
+        />
+      )}
     </div>
   );
 }
