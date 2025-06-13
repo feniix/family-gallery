@@ -72,11 +72,11 @@ CLERK_SECRET_KEY=sk_live_...
 
 #### Cloudflare R2 Storage
 ```
-R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
+R2_ACCOUNT_ID=your_account_id
 R2_ACCESS_KEY_ID=your_r2_access_key
 R2_SECRET_ACCESS_KEY=your_r2_secret_key
 R2_BUCKET_NAME=your-bucket-name
-R2_PUBLIC_URL=https://your-custom-domain.r2.dev
+# R2_PUBLIC_URL=https://your-custom-domain.r2.dev  # Optional - not needed for authenticated API routes
 ```
 
 #### Admin Configuration
