@@ -6,8 +6,7 @@
     "fg-import": "./scripts/fg-import"
   },
   "engines": {
-    "node": ">=18.0.0",
-    "yarn": ">=4.0.0"
+    "node": ">=22.16.0"
   },
   "scripts": {
     "clean": "rm -rf .next node_modules",
