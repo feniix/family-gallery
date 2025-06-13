@@ -199,8 +199,15 @@ const requiredEnvVars = [
   'R2_ACCESS_KEY_ID',
   'R2_SECRET_ACCESS_KEY',
   'R2_BUCKET_NAME',
-  // 'R2_PUBLIC_URL', // Optional - not needed for authenticated API routes
   'ADMIN_EMAILS',
+];
+
+// Optional but recommended environment variables
+const optionalEnvVars = [
+  'R2_PUBLIC_URL',
+  'CLERK_WEBHOOK_SECRET',
+  'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
+  'NEXT_PUBLIC_CLERK_SIGN_UP_URL',
 ];
 
 const configLogger = createLogger('CONFIG');
@@ -209,6 +216,13 @@ const configLogger = createLogger('CONFIG');
 if (typeof window === 'undefined') {
   try {
     validateRequiredEnvVars(requiredEnvVars);
+    
+    // Check optional variables and warn if missing
+    optionalEnvVars.forEach(envVar => {
+      if (!process.env[envVar]) {
+        configLogger.warn(`Optional environment variable missing: ${envVar}`);
+      }
+    });
   } catch (error) {
     configLogger.error('Configuration validation failed', { error: error instanceof Error ? error.message : String(error) });
     throw error;

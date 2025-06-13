@@ -9,8 +9,21 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: '4d38d810481402dae4e99fe589d6e4ee.r2.cloudflarestorage.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
+  // Production optimizations
+  experimental: {
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+  },
+  // Compression and optimization
+  compress: true,
+  poweredByHeader: false,
   // Reduce default logging since we have structured access logging
   logging: {
     fetches: {
