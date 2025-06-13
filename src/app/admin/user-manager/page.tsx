@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 
@@ -18,26 +18,26 @@ import { toast } from 'sonner'
 import { 
   Users, 
   UserPlus, 
-  UserMinus, 
+  // UserMinus, 
   UserCheck, 
   UserX, 
   Shield, 
   Search, 
-  Filter, 
-  MoreVertical,
+  // Filter, 
+  // MoreVertical,
   Edit3,
   Trash2,
   Mail,
   Calendar,
   Activity,
-  Download,
-  Upload,
+  // Download,
+  // Upload,
   AlertTriangle,
   Clock,
   CheckCircle,
   Ban,
-  Key,
-  Eye,
+  // Key,
+  // Eye,
   EyeOff
 } from 'lucide-react'
 import { authLogger } from '@/lib/logger'
@@ -92,6 +92,7 @@ export default function UserManagerPage() {
   const [editingUser, setEditingUser] = useState<UserWithAccess | null>(null)
   const [bulkActionDialog, setBulkActionDialog] = useState(false)
   const [inviteDialog, setInviteDialog] = useState(false)
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<UserWithAccess | null>(null)
   
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -265,6 +266,39 @@ export default function UserManagerPage() {
 
   const clearSelection = () => {
     setSelectedUsers(new Set())
+  }
+
+  // Handle user deletion
+  const deleteUser = async (userId: string) => {
+    try {
+      setActionLoading(userId)
+      
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete',
+          targetUserId: userId
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete user')
+      }
+
+      const data = await response.json()
+      
+      // Remove user from local state
+      setUsers(prevUsers => prevUsers.filter(user => user.id !== userId))
+      setDeleteConfirmUser(null)
+      
+      toast.success(`User ${data.deletedUser.name} deleted successfully`)
+    } catch (error) {
+      authLogger.error('Error deleting user', { error })
+      toast.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setActionLoading(null)
+    }
   }
 
   // Handle user editing
@@ -533,7 +567,7 @@ export default function UserManagerPage() {
               </SelectContent>
             </Select>
 
-            <Select value={sortBy} onValueChange={(val) => setSortBy(val as any)}>
+            <Select value={sortBy} onValueChange={(val) => setSortBy(val as 'created' | 'email' | 'name' | 'lastLogin')}>
               <SelectTrigger>
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
@@ -545,7 +579,7 @@ export default function UserManagerPage() {
               </SelectContent>
             </Select>
 
-            <Select value={sortOrder} onValueChange={(val) => setSortOrder(val as any)}>
+            <Select value={sortOrder} onValueChange={(val) => setSortOrder(val as 'desc' | 'asc')}>
               <SelectTrigger>
                 <SelectValue placeholder="Order" />
               </SelectTrigger>
@@ -616,6 +650,14 @@ export default function UserManagerPage() {
                         <UserX className="h-4 w-4 mr-2" />
                         Suspend All Selected
                       </Button>
+                      <Button 
+                        className="w-full justify-start" 
+                        variant="destructive"
+                        onClick={() => performBulkAction({ type: 'delete' })}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete All Selected
+                      </Button>
                       <div className="border-t pt-4">
                         <Label className="text-sm font-medium">Change Role for All Selected:</Label>
                         <div className="grid grid-cols-2 gap-2 mt-2">
@@ -624,7 +666,7 @@ export default function UserManagerPage() {
                               key={role}
                               size="sm"
                               variant="outline"
-                              onClick={() => performBulkAction({ type: 'change-role', role: role as any })}
+                              onClick={() => performBulkAction({ type: 'change-role', role: role as 'admin' | 'family' | 'extended-family' | 'friend' | 'guest' })}
                             >
                               {role.replace('-', ' ')}
                             </Button>
@@ -797,6 +839,15 @@ export default function UserManagerPage() {
                     >
                       <Edit3 className="h-4 w-4" />
                     </Button>
+
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setDeleteConfirmUser(user)}
+                      disabled={actionLoading === user.id}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -885,6 +936,30 @@ export default function UserManagerPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmUser} onOpenChange={() => setDeleteConfirmUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteConfirmUser?.name}</strong> ({deleteConfirmUser?.email})?
+              <br /><br />
+              This action cannot be undone. The user will be permanently removed from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteConfirmUser && deleteUser(deleteConfirmUser.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={actionLoading === deleteConfirmUser?.id}
+            >
+              {actionLoading === deleteConfirmUser?.id ? 'Deleting...' : 'Delete User'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
       )
   }

@@ -143,6 +143,33 @@ export async function POST(request: NextRequest) {
         updatedUser = suspendUser(targetUser);
         break;
       
+      case 'delete':
+        // Prevent self-deletion
+        if (targetUserId === userId) {
+          return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 });
+        }
+        
+        // Delete user from database
+        delete usersData.users[targetUserId];
+        await withRetry(() => usersDb.write(usersData));
+
+        apiLogger.info('User deleted', {
+          adminUserId: userId,
+          adminEmail,
+          deletedUserId: targetUserId,
+          deletedUserEmail: targetUser.email
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: 'User deleted successfully',
+          deletedUser: {
+            id: targetUserId,
+            email: targetUser.email,
+            name: targetUser.name
+          }
+        });
+      
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }

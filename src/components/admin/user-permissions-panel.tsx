@@ -116,7 +116,7 @@ export default function UserPermissionsPanel({
   }, [userRole, hasCustomPermissions])
 
   // Handle permission changes
-  const updatePermission = (key: keyof UserPermissions['permissions'], value: any) => {
+  const updatePermission = (key: keyof UserPermissions['permissions'], value: boolean | string[]) => {
     const newPermissions = {
       ...permissions,
       permissions: {
@@ -129,19 +129,19 @@ export default function UserPermissionsPanel({
     onPermissionsChange?.(newPermissions)
   }
 
-  // Handle custom access changes
-  const updateCustomAccess = (key: keyof NonNullable<UserPermissions['customAccess']>, value: any) => {
-    const newPermissions = {
-      ...permissions,
-      customAccess: {
-        ...permissions.customAccess,
-        [key]: value
-      }
-    }
-    setPermissions(newPermissions)
-    setHasCustomPermissions(true)
-    onPermissionsChange?.(newPermissions)
-  }
+  // // Handle custom access changes
+  // const updateCustomAccess = (key: keyof NonNullable<UserPermissions['customAccess']>, value: string[] | number[]) => {
+  //   const newPermissions = {
+  //     ...permissions,
+  //     customAccess: {
+  //       ...permissions.customAccess,
+  //       [key]: value
+  //     }
+  //   }
+  //   setPermissions(newPermissions)
+  //   setHasCustomPermissions(true)
+  //   onPermissionsChange?.(newPermissions)
+  // }
 
   // Reset to role defaults
   const resetToDefaults = () => {
@@ -263,7 +263,7 @@ export default function UserPermissionsPanel({
                       <div className="pl-6">
                         <Checkbox
                           checked={permissions.permissions[category.key as keyof UserPermissions['permissions']] as boolean}
-                          onCheckedChange={(checked: boolean) => updatePermission(category.key as any, checked)}
+                          onCheckedChange={(checked: boolean) => updatePermission(category.key as keyof UserPermissions['permissions'], checked)}
                         />
                       </div>
                     )}
@@ -279,7 +279,7 @@ export default function UserPermissionsPanel({
                                 const newValues = checked
                                   ? [...(currentValues || []), level.value]
                                   : (currentValues || []).filter(v => v !== level.value)
-                                updatePermission(category.key as any, newValues)
+                                updatePermission(category.key as keyof UserPermissions['permissions'], newValues)
                               }}
                             />
                             <div>

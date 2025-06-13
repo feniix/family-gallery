@@ -19,7 +19,6 @@ import {
   Settings,
   Activity,
   HardDrive,
-  Folder,
   FolderTree
 } from 'lucide-react'
 import { toast } from 'sonner'

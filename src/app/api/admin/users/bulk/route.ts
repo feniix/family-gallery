@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { getIsAdmin } from '@/lib/server-auth'
 import { usersDb, withRetry } from '@/lib/json-db'
-import { approveUser, promoteUser, suspendUser, userHasAccess } from '@/lib/users'
+import { approveUser, promoteUser, suspendUser } from '@/lib/users'
 import { apiLogger } from '@/lib/logger'
 import type { UsersData, UserData } from '@/types/media'
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No users selected' }, { status: 400 })
     }
 
-    if (!['approve', 'suspend', 'change-role'].includes(action)) {
+    if (!['approve', 'suspend', 'change-role', 'delete'].includes(action)) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
 
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Prevent self-modification for certain actions
-        if (targetUserId === userId && (action === 'suspend' || action === 'change-role')) {
+        if (targetUserId === userId && (action === 'suspend' || action === 'change-role' || action === 'delete')) {
           results.push({ userId: targetUserId, success: false, error: 'Cannot modify your own account' })
           continue
         }
@@ -94,6 +94,12 @@ export async function POST(request: NextRequest) {
               updatedUser = promoteUser(targetUser, role as 'family' | 'extended-family' | 'friend', adminEmail || 'bulk-admin')
             }
             break
+          case 'delete':
+            // Delete user from database
+            delete usersData.users[targetUserId]
+            processed++
+            results.push({ userId: targetUserId, success: true })
+            continue // Skip the update step since we deleted the user
           default:
             results.push({ userId: targetUserId, success: false, error: 'Invalid action' })
             continue
