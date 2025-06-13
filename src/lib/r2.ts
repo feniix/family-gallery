@@ -11,10 +11,10 @@ export const r2Config = {
   publicUrl: typeof window === 'undefined' ? process.env.R2_PUBLIC_URL : '', // Optional
 };
 
-// Validate R2 configuration (only on server-side, skip in test environment)
-if (typeof window === 'undefined' && process.env.NODE_ENV !== 'test') {
+// Validate R2 configuration function - called when actually needed
+function validateR2Config(): void {
   if (!r2Config.accountId || !r2Config.accessKeyId || !r2Config.secretAccessKey || !r2Config.bucketName) {
-    throw new Error('Missing required R2 environment variables');
+    throw new Error('Missing required R2 environment variables: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME');
   }
 }
 
@@ -22,14 +22,25 @@ if (typeof window === 'undefined' && process.env.NODE_ENV !== 'test') {
 export const r2Client = typeof window === 'undefined' 
   ? (process.env.NODE_ENV === 'test' 
       ? null  // Skip S3Client creation in test environment
-      : new S3Client({
-          region: 'auto',
-          endpoint: `https://${r2Config.accountId}.r2.cloudflarestorage.com`,
-          credentials: {
-            accessKeyId: r2Config.accessKeyId,
-            secretAccessKey: r2Config.secretAccessKey,
-          },
-        })
+      : (() => {
+          // Validate configuration before creating client
+          try {
+            validateR2Config();
+            return new S3Client({
+              region: 'auto',
+              endpoint: `https://${r2Config.accountId}.r2.cloudflarestorage.com`,
+              credentials: {
+                accessKeyId: r2Config.accessKeyId,
+                secretAccessKey: r2Config.secretAccessKey,
+              },
+            });
+          } catch (error) {
+            // During build time or when R2 is not configured, return null
+            // The actual validation will happen when R2 functions are called
+            console.warn('R2 client not initialized:', error instanceof Error ? error.message : 'Unknown error');
+            return null;
+          }
+        })()
     )
   : null;
 
@@ -44,7 +55,13 @@ function ensureServerSide(): void {
     return; // Skip R2 client checks in test environment
   }
   if (!r2Client) {
-    throw new Error('R2 client not initialized');
+    // Try to validate configuration to give a better error message
+    try {
+      validateR2Config();
+      throw new Error('R2 client not initialized despite valid configuration');
+    } catch (configError) {
+      throw new Error(`R2 client not available: ${configError instanceof Error ? configError.message : 'Unknown error'}`);
+    }
   }
 }
 
