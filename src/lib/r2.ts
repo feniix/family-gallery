@@ -161,9 +161,37 @@ export async function generatePresignedDownloadUrl(
 
     r2Logger.debug('Creating presigned download command', { bucket: r2Config.bucketName, key });
     const presignedUrl = await getSignedUrl(r2Client!, command, { expiresIn });
-    r2Logger.debug('Presigned download URL generated successfully', { key, urlLength: presignedUrl.length });
     
-    return presignedUrl;
+    // Replace default R2 endpoint with custom domain if configured
+    let finalUrl = presignedUrl;
+    r2Logger.debug('Custom domain replacement check', {
+      hasPublicUrl: !!r2Config.publicUrl,
+      publicUrl: r2Config.publicUrl,
+      originalUrl: presignedUrl.substring(0, 100) + '...',
+      key
+    });
+    
+    if (r2Config.publicUrl) {
+      // The signed URL includes the bucket name in the hostname
+      const defaultEndpoint = `https://${r2Config.bucketName}.${r2Config.accountId}.r2.cloudflarestorage.com`;
+      finalUrl = presignedUrl.replace(defaultEndpoint, r2Config.publicUrl);
+      r2Logger.debug('Replaced R2 endpoint with custom domain', { 
+        originalEndpoint: defaultEndpoint,
+        customDomain: r2Config.publicUrl,
+        originalUrl: presignedUrl.substring(0, 100) + '...',
+        finalUrl: finalUrl.substring(0, 100) + '...',
+        key 
+      });
+    } else {
+      r2Logger.warn('No custom domain configured, using default R2 endpoint', {
+        publicUrl: r2Config.publicUrl,
+        key
+      });
+    }
+    
+    r2Logger.debug('Presigned download URL generated successfully', { key, urlLength: finalUrl.length });
+    
+    return finalUrl;
   } catch (error) {
     r2Logger.error('Failed to generate presigned download URL', { 
       key, 
