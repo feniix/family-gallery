@@ -56,6 +56,8 @@ export const galleryConfig = {
 export const r2Config = {
   // Presigned URL expiration in seconds
   presignedUrlExpiration: parseInt(process.env.R2_PRESIGNED_URL_EXPIRATION || '900'), // Default: 15 minutes
+  // Enable direct serving from R2 using signed URLs (default: false for backward compatibility)
+  useSignedUrls: process.env.R2_USE_SIGNED_URLS === 'true',
 } as const;
 
 /**
