@@ -4,6 +4,7 @@ import { getMediaDb, withRetry } from '@/lib/json-db';
 import { r2Client } from '@/lib/r2';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { apiLogger } from '@/lib/logger';
+import { checkUserHasAccessSmart } from '@/lib/server-auth';
 
 /**
  * GET /api/media/download/[id]
@@ -18,6 +19,12 @@ export async function GET(
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check user access permissions
+    const hasAccess = await checkUserHasAccessSmart({ userId });
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     const { id } = await params;
