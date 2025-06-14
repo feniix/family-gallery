@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Clock, Mail, RefreshCw } from 'lucide-react';
+import { authenticatedFetch } from '@/lib/api-client';
 import { authLogger } from '@/lib/logger'
 
 interface UserStatus {
@@ -27,8 +28,8 @@ export default function PendingApprovalPage() {
       
       // First, try to auto-create admin user if they're an admin email
       try {
-        const adminResponse = await fetch('/api/auto-create-admin', {
-          method: 'POST',
+        const adminResponse = await authenticatedFetch('/api/auto-create-admin', {
+          method: 'POST'
         });
         if (adminResponse.ok) {
           const adminData = await adminResponse.json();
@@ -47,8 +48,8 @@ export default function PendingApprovalPage() {
       
       // Try to create user in database if they don't exist
       try {
-        const createResponse = await fetch('/api/user/create', {
-          method: 'POST',
+        const createResponse = await authenticatedFetch('/api/user/create', {
+          method: 'POST'
         });
         if (createResponse.ok) {
           const createData = await createResponse.json();
@@ -59,7 +60,7 @@ export default function PendingApprovalPage() {
         // Continue with status check even if creation fails
       }
       
-      const response = await fetch('/api/user/status');
+      const response = await authenticatedFetch('/api/user/status');
       if (response.ok) {
         const data = await response.json();
         const currentUser = data.user;

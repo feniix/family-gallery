@@ -28,6 +28,7 @@ import { extractExifMetadata } from '@/lib/exif';
 import { generateVideoThumbnail } from '@/lib/video-processing';
 import type { MediaMetadata } from '@/types/media';
 import { uploadLogger, exifLogger } from '@/lib/logger';
+import { authenticatedFetch } from '@/lib/api-client';
 
 interface BulkUploadZoneProps {
   availableTags: string[];
@@ -345,7 +346,7 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
             formData.append('thumbnail', uploadFile.videoThumbnail, 'thumbnail.jpg');
           }
 
-          const videoUploadResponse = await fetch('/api/upload/video', {
+          const videoUploadResponse = await authenticatedFetch('/api/upload/video', {
             method: 'POST',
             body: formData
           });
@@ -369,9 +370,8 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
 
 
           // Get presigned URL using the properly processed takenAt date
-          const presignedResponse = await fetch('/api/upload/presigned', {
+          const presignedResponse = await authenticatedFetch('/api/upload/presigned', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               filename: uploadFile.file.name,
               contentType: uploadFile.file.type,
@@ -461,9 +461,8 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
 
           
           // Save to database
-          const saveResponse = await fetch('/api/media', {
+          const saveResponse = await authenticatedFetch('/api/media', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(mediaMetadata)
           });
 
@@ -481,9 +480,8 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
         if (state.selectedTags.length > 0 && result.id) {
           const uniqueTags = [...new Set([...result.tags, ...state.selectedTags])];
           if (uniqueTags.length !== result.tags.length) {
-            await fetch('/api/media/tags', {
+            await authenticatedFetch('/api/media/tags', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 action: 'update-media-tags',
                 mediaId: result.id,

@@ -40,6 +40,7 @@ import {
   // Eye,
   EyeOff
 } from 'lucide-react'
+import { authenticatedFetch } from '@/lib/api-client'
 import { authLogger } from '@/lib/logger'
 
 interface UserWithAccess {
@@ -116,8 +117,8 @@ export default function UserManagerPage() {
       }
 
       const [usersResponse, statsResponse] = await Promise.all([
-        fetch(`/api/admin/users?${params}`),
-        fetch('/api/admin/user-stats')
+        authenticatedFetch(`/api/admin/users?${params}`),
+        authenticatedFetch('/api/admin/user-stats')
       ])
 
       if (!usersResponse.ok || !statsResponse.ok) {
@@ -142,9 +143,8 @@ export default function UserManagerPage() {
     try {
       setActionLoading(userId)
       
-      const response = await fetch('/api/admin/users', {
+      const response = await authenticatedFetch('/api/admin/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action,
           targetUserId: userId,
@@ -181,9 +181,8 @@ export default function UserManagerPage() {
     try {
       setActionLoading('bulk')
       
-      const response = await fetch('/api/admin/users/bulk', {
+      const response = await authenticatedFetch('/api/admin/users/bulk', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userIds: Array.from(selectedUsers),
           action: bulkAction.type,
@@ -273,9 +272,8 @@ export default function UserManagerPage() {
     try {
       setActionLoading(userId)
       
-      const response = await fetch('/api/admin/users', {
+      const response = await authenticatedFetch('/api/admin/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'delete',
           targetUserId: userId

@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { Check, X, UserPlus, UserMinus, Users, AlertTriangle, Clock } from 'lucide-react';
+import { authenticatedFetch } from '@/lib/api-client';
 import { authLogger } from '@/lib/logger'
 
 interface UserWithAccess {
@@ -43,7 +44,7 @@ export default function UserManagementPanel() {
         }
       }
 
-      const response = await fetch(`/api/admin/users?${params}`);
+      const response = await authenticatedFetch(`/api/admin/users?${params}`);
       if (!response.ok) {
         throw new Error('Failed to fetch users');
       }
@@ -63,11 +64,8 @@ export default function UserManagementPanel() {
     try {
       setActionLoading(userId);
       
-      const response = await fetch('/api/admin/users', {
+      const response = await authenticatedFetch('/api/admin/users', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           action,
           targetUserId: userId,

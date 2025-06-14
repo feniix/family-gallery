@@ -14,7 +14,8 @@ import {
   MediaMemoryManager, 
   getLoadingStrategy 
 } from '@/lib/performance';
-import { dbLogger } from '@/lib/logger'
+import { dbLogger } from '@/lib/logger';
+import { authenticatedFetch } from '@/lib/api-client';
 
 interface TimelineViewProps {
   onMediaUpdate?: (media: MediaMetadata[]) => void;
@@ -154,7 +155,7 @@ export function TimelineView({
       const startTime = enablePerformanceOptimizations ? performance.now() : 0;
       
       try {
-        const response = await fetch(`/api/media/all?limit=${loadingStrategy.initialBatchSize}&offset=0`);
+        const response = await authenticatedFetch(`/api/media/all?limit=${loadingStrategy.initialBatchSize}&offset=0`);
         if (!response.ok) throw new Error('Failed to load');
         
         const data = await response.json();
@@ -194,7 +195,7 @@ export function TimelineView({
       const startTime = enablePerformanceOptimizations ? performance.now() : 0;
       
       try {
-        const response = await fetch(`/api/media/all?limit=${loadingStrategy.batchSize}&offset=${offsetRef.current}`);
+        const response = await authenticatedFetch(`/api/media/all?limit=${loadingStrategy.batchSize}&offset=${offsetRef.current}`);
         if (!response.ok) throw new Error('Failed to load more');
         
         const data = await response.json();

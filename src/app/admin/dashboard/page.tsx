@@ -22,6 +22,7 @@ import {
   FolderTree
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { authenticatedFetch } from '@/lib/api-client'
 import UserManagementPanel from '@/components/admin/user-management-panel'
 
 interface DashboardStats {
@@ -75,7 +76,7 @@ export default function AdminDashboardPage() {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetch('/api/admin/stats')
+      const response = await authenticatedFetch('/api/admin/stats')
       if (!response.ok) {
         throw new Error('Failed to fetch statistics')
       }

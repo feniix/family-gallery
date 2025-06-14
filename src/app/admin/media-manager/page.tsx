@@ -53,6 +53,7 @@ import { BulkUploadZone } from '@/components/admin/bulk-upload-zone';
 import { SimpleLightbox } from '@/components/gallery/simple-lightbox';
 import type { MediaMetadata } from '@/types/media';
 import { apiLogger } from '@/lib/logger';
+import { authenticatedFetch } from '@/lib/api-client';
 
 interface MediaManagerState {
   media: MediaMetadata[];
@@ -123,8 +124,8 @@ export default function MediaManagerPage() {
       setState(prev => ({ ...prev, loading: true }));
 
       const [mediaResponse, tagsResponse] = await Promise.all([
-        fetch('/api/media/all?limit=500'),
-        fetch('/api/media/tags?action=list')
+        authenticatedFetch('/api/media/all?limit=500'),
+        authenticatedFetch('/api/media/tags?action=list')
       ]);
 
       if (mediaResponse.ok && tagsResponse.ok) {
@@ -151,7 +152,7 @@ export default function MediaManagerPage() {
 
   const handleDeleteMedia = async (mediaId: string, year: number) => {
     try {
-      const response = await fetch(`/api/media?id=${mediaId}&year=${year}`, {
+      const response = await authenticatedFetch(`/api/media?id=${mediaId}&year=${year}`, {
         method: 'DELETE'
       });
 
@@ -197,9 +198,8 @@ export default function MediaManagerPage() {
         body.tags = tags;
       }
 
-      const response = await fetch('/api/media/bulk', {
+      const response = await authenticatedFetch('/api/media/bulk', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
 
@@ -244,9 +244,8 @@ export default function MediaManagerPage() {
 
   const handleEditDate = async (mediaId: string, newDate: string) => {
     try {
-      const response = await fetch('/api/media/edit', {
+      const response = await authenticatedFetch('/api/media/edit', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mediaId,
           updates: { takenAt: newDate }
@@ -281,9 +280,8 @@ export default function MediaManagerPage() {
 
   const handleEditTags = async (mediaId: string, tags: string[]) => {
     try {
-      const response = await fetch('/api/media/tags', {
+      const response = await authenticatedFetch('/api/media/tags', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'update-media-tags',
           mediaId,
@@ -323,9 +321,8 @@ export default function MediaManagerPage() {
     }
 
     try {
-      const response = await fetch('/api/media/tags', {
+      const response = await authenticatedFetch('/api/media/tags', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'create-tag',
           newTag: newTag.trim()
@@ -357,7 +354,7 @@ export default function MediaManagerPage() {
 
   const handleDeleteTag = async (tag: string) => {
     try {
-      const response = await fetch(`/api/media/tags?tag=${encodeURIComponent(tag)}`, {
+      const response = await authenticatedFetch(`/api/media/tags?tag=${encodeURIComponent(tag)}`, {
         method: 'DELETE'
       });
 
