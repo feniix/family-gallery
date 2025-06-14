@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import Image from 'next/image';
 import { MediaMetadata } from '@/types/media';
 import { useSignedUrl } from '@/hooks/use-signed-url';
 import { useIntersectionObserver } from '@/hooks/use-intersection-observer';
@@ -121,14 +120,12 @@ export function PhotoCardSigned({ media, onClick, priority = false, aspectRatio 
       style={aspectConfig.useInlineStyle ? aspectConfig.style : undefined}
       onClick={onClick}
     >
-      {/* Main Image */}
-      <Image
+      {/* Main Image - Use regular img tag for signed URLs to bypass Next.js image optimization */}
+      <img
         src={thumbnailUrl}
         alt={media.originalFilename}
-        fill
-        className="object-cover group-hover:scale-105 transition-transform duration-200"
-        sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-        priority={priority}
+        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+        loading={priority ? 'eager' : 'lazy'}
         onError={() => setImageError(true)}
       />
 

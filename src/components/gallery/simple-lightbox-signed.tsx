@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import { MediaMetadata } from '@/types/media';
 import { useSignedUrl } from '@/hooks/use-signed-url';
 import { useSmartPreloading } from '@/hooks/use-smart-preloading';
@@ -268,13 +267,10 @@ export function SimpleLightboxSigned({
                 className="relative flex items-center justify-center"
                 style={containerStyle}
               >
-                <Image
+                <img
                   src={fullImageUrl}
                   alt={media.originalFilename}
-                  width={imageDimensions?.width || 1600}
-                  height={imageDimensions?.height || 1200}
                   className="object-contain w-full h-full"
-                  priority
                   style={{
                     aspectRatio: imageDimensions?.aspectRatio || 'auto'
                   }}

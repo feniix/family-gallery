@@ -98,6 +98,16 @@ export function useSignedUrl({
 
       const data: SignedUrlResponse = await response.json();
       
+      // Debug logging
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Signed URL generated:', {
+          mediaId,
+          isThumbnail,
+          signedUrl: data.signedUrl,
+          expiresAt: data.expiresAt
+        });
+      }
+      
       // Cache the result
       const expiresAt = new Date(data.expiresAt);
       signedUrlCache.set(cacheKey, {
