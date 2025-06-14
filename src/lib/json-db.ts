@@ -119,13 +119,14 @@ export async function writeJsonFile<T = any>(filename: string, data: T): Promise
     });
     
     dbLogger.debug(`Successfully wrote file: ${filename}`);
-  } catch (error: any) {
+  } catch (error) {
+    const err = error as Error & { code?: string; $metadata?: { httpStatusCode?: number } };
     dbLogger.error(`Error writing file: ${filename}`, {
-      name: error.name,
-      code: error.code,
-      httpStatusCode: error.$metadata?.httpStatusCode,
-      message: error.message,
-      stack: error.stack
+      name: err.name,
+      code: err.code,
+      httpStatusCode: err.$metadata?.httpStatusCode,
+      message: err.message,
+      stack: err.stack
     });
     throw error;
   }
