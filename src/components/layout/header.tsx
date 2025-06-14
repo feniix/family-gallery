@@ -10,7 +10,7 @@ import { Images, Home, BarChart3, FolderTree, Users } from 'lucide-react'
 
 export function Header() {
   const pathname = usePathname()
-  const isAdmin = useIsAdmin()
+  const { isAdmin } = useIsAdmin()
   const { isSignedIn } = useUser()
 
   const navigation = [

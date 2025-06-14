@@ -4,6 +4,8 @@
  * Updated: 2025-06-14 - Force cache bust
  */
 
+import { apiLogger } from '@/lib/logger'
+
 export interface ApiResponse<T = unknown> {
   ok: boolean;
   status: number;
@@ -18,9 +20,13 @@ export async function authenticatedFetch(
   url: string, 
   options: RequestInit = {}
 ): Promise<Response> {
-  console.log('🔐 authenticatedFetch called:', url, { credentials: 'include' });
-  console.log('🔐 Request headers:', options.headers);
-  console.log('🔐 Document cookies:', document.cookie ? 'Present' : 'None');
+  apiLogger.debug('Authenticated fetch called', { 
+    url, 
+    method: options.method || 'GET',
+    hasCredentials: true,
+    hasHeaders: !!options.headers,
+    hasCookies: typeof document !== 'undefined' ? !!document.cookie : false
+  });
   
   const response = await fetch(url, {
     ...options,
@@ -31,15 +37,22 @@ export async function authenticatedFetch(
     },
   });
   
-  console.log('🔐 Response status:', response.status, response.statusText);
-  console.log('🔐 Response headers:', Object.fromEntries(response.headers.entries()));
+  apiLogger.debug('Authenticated fetch response', { 
+    url,
+    status: response.status, 
+    statusText: response.statusText,
+    headers: Object.fromEntries(response.headers.entries())
+  });
   
   // If we get a redirect, log more details
   if (response.status === 307 || response.status === 302) {
-    console.log('🔐 REDIRECT detected - this indicates authentication failure');
-    console.log('🔐 Redirect location:', response.headers.get('location'));
-    console.log('🔐 Clerk auth status:', response.headers.get('x-clerk-auth-status'));
-    console.log('🔐 Clerk auth reason:', response.headers.get('x-clerk-auth-reason'));
+    apiLogger.warn('Authentication redirect detected', {
+      url,
+      status: response.status,
+      location: response.headers.get('location'),
+      clerkAuthStatus: response.headers.get('x-clerk-auth-status'),
+      clerkAuthReason: response.headers.get('x-clerk-auth-reason')
+    });
   }
   
   return response;
@@ -54,7 +67,12 @@ export async function apiGet<T = unknown>(url: string): Promise<ApiResponse<T>> 
     
     // Handle authentication redirects
     if (response.status === 307 || response.status === 302) {
-      console.error('🔐 Authentication failed - user not logged in or session expired');
+      apiLogger.error('Authentication failed - redirect detected', { 
+        url,
+        method: 'GET',
+        status: response.status,
+        message: 'User not logged in or session expired'
+      });
       return { 
         ok: false, 
         status: 401, 
@@ -74,7 +92,10 @@ export async function apiGet<T = unknown>(url: string): Promise<ApiResponse<T>> 
       };
     }
   } catch (error) {
-    console.error('🔐 API request failed:', error);
+    apiLogger.error('API GET request failed', { 
+      url,
+      error: error instanceof Error ? error.message : String(error)
+    });
     return { 
       ok: false, 
       status: 0, 
@@ -98,7 +119,12 @@ export async function apiPost<T = unknown>(
     
     // Handle authentication redirects
     if (response.status === 307 || response.status === 302) {
-      console.error('🔐 Authentication failed - user not logged in or session expired');
+      apiLogger.error('Authentication failed - redirect detected', { 
+        url,
+        method: 'POST',
+        status: response.status,
+        message: 'User not logged in or session expired'
+      });
       return { 
         ok: false, 
         status: 401, 
@@ -118,7 +144,10 @@ export async function apiPost<T = unknown>(
       };
     }
   } catch (error) {
-    console.error('🔐 API request failed:', error);
+    apiLogger.error('API POST request failed', { 
+      url,
+      error: error instanceof Error ? error.message : String(error)
+    });
     return { 
       ok: false, 
       status: 0, 
@@ -142,7 +171,12 @@ export async function apiPut<T = unknown>(
     
     // Handle authentication redirects
     if (response.status === 307 || response.status === 302) {
-      console.error('🔐 Authentication failed - user not logged in or session expired');
+      apiLogger.error('Authentication failed - redirect detected', { 
+        url,
+        method: 'PUT',
+        status: response.status,
+        message: 'User not logged in or session expired'
+      });
       return { 
         ok: false, 
         status: 401, 
@@ -162,7 +196,10 @@ export async function apiPut<T = unknown>(
       };
     }
   } catch (error) {
-    console.error('🔐 API request failed:', error);
+    apiLogger.error('API PUT request failed', { 
+      url,
+      error: error instanceof Error ? error.message : String(error)
+    });
     return { 
       ok: false, 
       status: 0, 
@@ -182,7 +219,12 @@ export async function apiDelete<T = unknown>(url: string): Promise<ApiResponse<T
     
     // Handle authentication redirects
     if (response.status === 307 || response.status === 302) {
-      console.error('🔐 Authentication failed - user not logged in or session expired');
+      apiLogger.error('Authentication failed - redirect detected', { 
+        url,
+        method: 'DELETE',
+        status: response.status,
+        message: 'User not logged in or session expired'
+      });
       return { 
         ok: false, 
         status: 401, 
@@ -202,7 +244,10 @@ export async function apiDelete<T = unknown>(url: string): Promise<ApiResponse<T
       };
     }
   } catch (error) {
-    console.error('🔐 API request failed:', error);
+    apiLogger.error('API DELETE request failed', { 
+      url,
+      error: error instanceof Error ? error.message : String(error)
+    });
     return { 
       ok: false, 
       status: 0, 

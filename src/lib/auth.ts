@@ -46,10 +46,23 @@ export function useIsAdmin() {
     checkAdminStatus()
   }, [user, isLoaded])
 
-  if (!isLoaded || isChecking) {
+  return {
+    isAdmin,
+    isLoading: !isLoaded || isChecking
+  }
+}
+
+/**
+ * Legacy version of useIsAdmin that returns just the boolean
+ * @deprecated Use useIsAdmin() and destructure { isAdmin } instead
+ */
+export function useIsAdminLegacy() {
+  const { isAdmin, isLoading } = useIsAdmin()
+  
+  if (isLoading) {
     return false
   }
-
+  
   return isAdmin
 }
 

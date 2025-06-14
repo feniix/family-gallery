@@ -6,10 +6,11 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { isAdminEmail } from '@/lib/utils'
+import { authLogger } from '@/lib/logger'
 
 export function AdminDebug() {
   const { user, isLoaded } = useUser()
-  const isAdmin = useIsAdmin()
+  const { isAdmin } = useIsAdmin()
   const [dbRole, setDbRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -27,7 +28,9 @@ export function AdminDebug() {
           setDbRole(data.role)
         }
       } catch (error) {
-        console.error('Error fetching user role:', error)
+        authLogger.error('Error fetching user role', { 
+          error: error instanceof Error ? error.message : String(error)
+        })
       } finally {
         setLoading(false)
       }

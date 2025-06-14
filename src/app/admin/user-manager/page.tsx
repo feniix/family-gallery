@@ -73,7 +73,7 @@ interface BulkAction {
 
 export default function UserManagerPage() {
   const { isLoaded } = useUser()
-  const isAdmin = useIsAdmin()
+  const { isAdmin, isLoading: isAdminLoading } = useIsAdmin()
   
   // State management
   const [users, setUsers] = useState<UserWithAccess[]>([])
@@ -363,13 +363,24 @@ export default function UserManagerPage() {
   }
 
   useEffect(() => {
-    if (isLoaded && isAdmin) {
+    if (isLoaded && !isAdminLoading && isAdmin) {
       loadData()
     }
-  }, [isLoaded, isAdmin, loadData])
+  }, [isLoaded, isAdminLoading, isAdmin, loadData])
+
+  // Show loading state while checking authentication
+  if (!isLoaded || isAdminLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    )
+  }
 
   // Redirect if not admin
-  if (isLoaded && !isAdmin) {
+  if (!isAdmin) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Card className="max-w-md mx-auto">
@@ -384,8 +395,8 @@ export default function UserManagerPage() {
     )
   }
 
-  // Show loading state
-  if (!isLoaded || loading) {
+  // Show loading state for data
+  if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-center min-h-[400px]">
