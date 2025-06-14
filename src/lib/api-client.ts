@@ -19,6 +19,8 @@ export async function authenticatedFetch(
   options: RequestInit = {}
 ): Promise<Response> {
   console.log('🔐 authenticatedFetch called:', url, { credentials: 'include' });
+  console.log('🔐 Request headers:', options.headers);
+  console.log('🔐 Document cookies:', document.cookie ? 'Present' : 'None');
   
   const response = await fetch(url, {
     ...options,
@@ -32,6 +34,14 @@ export async function authenticatedFetch(
   console.log('🔐 Response status:', response.status, response.statusText);
   console.log('🔐 Response headers:', Object.fromEntries(response.headers.entries()));
   
+  // If we get a redirect, log more details
+  if (response.status === 307 || response.status === 302) {
+    console.log('🔐 REDIRECT detected - this indicates authentication failure');
+    console.log('🔐 Redirect location:', response.headers.get('location'));
+    console.log('🔐 Clerk auth status:', response.headers.get('x-clerk-auth-status'));
+    console.log('🔐 Clerk auth reason:', response.headers.get('x-clerk-auth-reason'));
+  }
+  
   return response;
 }
 
@@ -41,6 +51,16 @@ export async function authenticatedFetch(
 export async function apiGet<T = unknown>(url: string): Promise<ApiResponse<T>> {
   try {
     const response = await authenticatedFetch(url);
+    
+    // Handle authentication redirects
+    if (response.status === 307 || response.status === 302) {
+      console.error('🔐 Authentication failed - user not logged in or session expired');
+      return { 
+        ok: false, 
+        status: 401, 
+        error: 'Authentication required - please sign in' 
+      };
+    }
     
     if (response.ok) {
       const data = await response.json();
@@ -54,6 +74,7 @@ export async function apiGet<T = unknown>(url: string): Promise<ApiResponse<T>> 
       };
     }
   } catch (error) {
+    console.error('🔐 API request failed:', error);
     return { 
       ok: false, 
       status: 0, 
@@ -75,6 +96,16 @@ export async function apiPost<T = unknown>(
       body: body ? JSON.stringify(body) : undefined,
     });
     
+    // Handle authentication redirects
+    if (response.status === 307 || response.status === 302) {
+      console.error('🔐 Authentication failed - user not logged in or session expired');
+      return { 
+        ok: false, 
+        status: 401, 
+        error: 'Authentication required - please sign in' 
+      };
+    }
+    
     if (response.ok) {
       const data = await response.json();
       return { ok: true, status: response.status, data };
@@ -87,6 +118,7 @@ export async function apiPost<T = unknown>(
       };
     }
   } catch (error) {
+    console.error('🔐 API request failed:', error);
     return { 
       ok: false, 
       status: 0, 
@@ -108,6 +140,16 @@ export async function apiPut<T = unknown>(
       body: body ? JSON.stringify(body) : undefined,
     });
     
+    // Handle authentication redirects
+    if (response.status === 307 || response.status === 302) {
+      console.error('🔐 Authentication failed - user not logged in or session expired');
+      return { 
+        ok: false, 
+        status: 401, 
+        error: 'Authentication required - please sign in' 
+      };
+    }
+    
     if (response.ok) {
       const data = await response.json();
       return { ok: true, status: response.status, data };
@@ -120,6 +162,7 @@ export async function apiPut<T = unknown>(
       };
     }
   } catch (error) {
+    console.error('🔐 API request failed:', error);
     return { 
       ok: false, 
       status: 0, 
@@ -137,6 +180,16 @@ export async function apiDelete<T = unknown>(url: string): Promise<ApiResponse<T
       method: 'DELETE',
     });
     
+    // Handle authentication redirects
+    if (response.status === 307 || response.status === 302) {
+      console.error('🔐 Authentication failed - user not logged in or session expired');
+      return { 
+        ok: false, 
+        status: 401, 
+        error: 'Authentication required - please sign in' 
+      };
+    }
+    
     if (response.ok) {
       const data = await response.json();
       return { ok: true, status: response.status, data };
@@ -149,6 +202,7 @@ export async function apiDelete<T = unknown>(url: string): Promise<ApiResponse<T
       };
     }
   } catch (error) {
+    console.error('🔐 API request failed:', error);
     return { 
       ok: false, 
       status: 0, 
