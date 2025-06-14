@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { MediaMetadata } from '@/types/media';
 import { useSignedUrl } from '@/hooks/use-signed-url';
 import { useIntersectionObserver } from '@/hooks/use-intersection-observer';
