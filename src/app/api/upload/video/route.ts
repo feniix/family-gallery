@@ -137,18 +137,23 @@ export async function POST(request: NextRequest) {
       try {
         const uniqueTags = [...new Set([...result.tags, ...tags])];
         if (uniqueTags.length !== result.tags.length) {
-          const tagResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080'}/api/media/tags`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'update-media-tags',
-              mediaId: result.id,
-              tags: uniqueTags
-            })
-          });
-          
-          if (tagResponse.ok) {
+          // Update tags directly in the database instead of making HTTP request
+          try {
+            const { getMediaDb } = await import('@/lib/json-db');
+            const mediaDb = getMediaDb(year);
+            await mediaDb.update((current) => {
+              const mediaIndex = current.media.findIndex(m => m.id === result.id);
+              if (mediaIndex !== -1) {
+                current.media[mediaIndex].tags = uniqueTags;
+              }
+              return current;
+            });
             result.tags = uniqueTags;
+            uploadLogger.info('Tags updated for uploaded video', { mediaId: result.id, tags: uniqueTags });
+          } catch (tagError) {
+            uploadLogger.warn('Failed to update tags for uploaded video', { error: tagError });
+            // Continue without tags rather than failing the upload
+            result.tags = uniqueTags; // Set in memory even if DB update failed
           }
         }
       } catch (tagError) {
