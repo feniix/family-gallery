@@ -10,11 +10,24 @@ import { authLogger } from './logger'
 export async function getIsAdmin(): Promise<boolean> {
   const user = await currentUser()
   
-  if (!user?.primaryEmailAddress?.emailAddress) {
+  if (!user?.id) {
     return false
   }
 
-  return isAdminEmail(user.primaryEmailAddress.emailAddress)
+  // First check if admin by email (for initial setup)
+  if (user.primaryEmailAddress?.emailAddress && isAdminEmail(user.primaryEmailAddress.emailAddress)) {
+    return true
+  }
+
+  // Then check database role
+  try {
+    const usersData: UsersData = await withRetry(() => usersDb.read())
+    const dbUser = usersData.users[user.id]
+    return dbUser?.role === 'admin'
+  } catch (error) {
+    authLogger.error('Error checking admin status from database', { error })
+    return false
+  }
 }
 
 /**
