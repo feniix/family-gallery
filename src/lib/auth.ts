@@ -35,7 +35,7 @@ export function useIsAdmin() {
           // Fallback to email checking if API fails
           setIsAdmin(isAdminEmail(user.primaryEmailAddress?.emailAddress || ''))
         }
-      } catch (error) {
+      } catch {
         // Fallback to email checking if API fails
         setIsAdmin(isAdminEmail(user.primaryEmailAddress?.emailAddress || ''))
       } finally {
