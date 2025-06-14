@@ -1,6 +1,7 @@
 import { S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { r2Logger } from './logger';
 
 // R2 Configuration - only available on server-side
 export const r2Config = {
@@ -13,9 +14,25 @@ export const r2Config = {
 
 // Validate R2 configuration function - called when actually needed
 function validateR2Config(): void {
+  r2Logger.debug('Validating R2 configuration', {
+    hasAccountId: !!r2Config.accountId,
+    hasAccessKeyId: !!r2Config.accessKeyId,
+    hasSecretAccessKey: !!r2Config.secretAccessKey,
+    hasBucketName: !!r2Config.bucketName,
+    hasPublicUrl: !!r2Config.publicUrl
+  });
+  
   if (!r2Config.accountId || !r2Config.accessKeyId || !r2Config.secretAccessKey || !r2Config.bucketName) {
+    r2Logger.error('Missing required R2 environment variables', {
+      accountId: !!r2Config.accountId,
+      accessKeyId: !!r2Config.accessKeyId,
+      secretAccessKey: !!r2Config.secretAccessKey,
+      bucketName: !!r2Config.bucketName
+    });
     throw new Error('Missing required R2 environment variables: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME');
   }
+  
+  r2Logger.debug('R2 configuration validated successfully');
 }
 
 // Create R2 client (S3-compatible) - only on server-side, mock in test environment
@@ -26,18 +43,24 @@ export const r2Client = typeof window === 'undefined'
           // Validate configuration before creating client
           try {
             validateR2Config();
-            return new S3Client({
+            const endpoint = `https://${r2Config.accountId}.r2.cloudflarestorage.com`;
+            r2Logger.debug('Creating R2 client', { endpoint, bucketName: r2Config.bucketName });
+            
+            const client = new S3Client({
               region: 'auto',
-              endpoint: `https://${r2Config.accountId}.r2.cloudflarestorage.com`,
+              endpoint,
               credentials: {
                 accessKeyId: r2Config.accessKeyId,
                 secretAccessKey: r2Config.secretAccessKey,
               },
             });
+            
+            r2Logger.info('R2 client initialized successfully');
+            return client;
           } catch (error) {
             // During build time or when R2 is not configured, return null
             // The actual validation will happen when R2 functions are called
-            console.warn('R2 client not initialized:', error instanceof Error ? error.message : 'Unknown error');
+            r2Logger.warn('R2 client not initialized', { error: error instanceof Error ? error.message : 'Unknown error' });
             return null;
           }
         })()
@@ -48,13 +71,20 @@ export const r2Client = typeof window === 'undefined'
  * Ensure we're on server-side before making R2 calls
  */
 function ensureServerSide(): void {
+  r2Logger.debug('Ensuring server-side execution for R2 operations');
+  
   if (typeof window !== 'undefined') {
+    r2Logger.error('Attempted R2 operation from client-side');
     throw new Error('R2 operations can only be performed on the server-side');
   }
+  
   if (process.env.NODE_ENV === 'test') {
+    r2Logger.debug('Skipping R2 client checks in test environment');
     return; // Skip R2 client checks in test environment
   }
+  
   if (!r2Client) {
+    r2Logger.error('R2 client not available');
     // Try to validate configuration to give a better error message
     try {
       validateR2Config();
@@ -63,6 +93,8 @@ function ensureServerSide(): void {
       throw new Error(`R2 client not available: ${configError instanceof Error ? configError.message : 'Unknown error'}`);
     }
   }
+  
+  r2Logger.debug('R2 server-side validation passed');
 }
 
 /**
@@ -76,20 +108,36 @@ export async function generatePresignedUploadUrl(
   contentType?: string,
   expiresIn: number = 900 // 15 minutes
 ): Promise<string> {
+  r2Logger.debug('Generating presigned upload URL', { key, contentType, expiresIn });
   ensureServerSide();
   
   // Return mock URL in test environment
   if (process.env.NODE_ENV === 'test') {
-    return `https://test.r2.dev/upload/${key}?expires=${Date.now() + expiresIn * 1000}`;
+    const mockUrl = `https://test.r2.dev/upload/${key}?expires=${Date.now() + expiresIn * 1000}`;
+    r2Logger.debug('Returning mock URL for test environment', { mockUrl });
+    return mockUrl;
   }
   
-  const command = new PutObjectCommand({
-    Bucket: r2Config.bucketName,
-    Key: key,
-    ContentType: contentType,
-  });
+  try {
+    const command = new PutObjectCommand({
+      Bucket: r2Config.bucketName,
+      Key: key,
+      ContentType: contentType,
+    });
 
-  return await getSignedUrl(r2Client!, command, { expiresIn });
+    r2Logger.debug('Creating presigned URL command', { bucket: r2Config.bucketName, key, contentType });
+    const presignedUrl = await getSignedUrl(r2Client!, command, { expiresIn });
+    r2Logger.debug('Presigned upload URL generated successfully', { key, urlLength: presignedUrl.length });
+    
+    return presignedUrl;
+  } catch (error) {
+    r2Logger.error('Failed to generate presigned upload URL', { 
+      key, 
+      contentType, 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+    throw error;
+  }
 }
 
 /**
@@ -102,14 +150,27 @@ export async function generatePresignedDownloadUrl(
   key: string,
   expiresIn: number = 3600 // 1 hour
 ): Promise<string> {
+  r2Logger.debug('Generating presigned download URL', { key, expiresIn });
   ensureServerSide();
   
-  const command = new GetObjectCommand({
-    Bucket: r2Config.bucketName,
-    Key: key,
-  });
+  try {
+    const command = new GetObjectCommand({
+      Bucket: r2Config.bucketName,
+      Key: key,
+    });
 
-  return await getSignedUrl(r2Client!, command, { expiresIn });
+    r2Logger.debug('Creating presigned download command', { bucket: r2Config.bucketName, key });
+    const presignedUrl = await getSignedUrl(r2Client!, command, { expiresIn });
+    r2Logger.debug('Presigned download URL generated successfully', { key, urlLength: presignedUrl.length });
+    
+    return presignedUrl;
+  } catch (error) {
+    r2Logger.error('Failed to generate presigned download URL', { 
+      key, 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+    throw error;
+  }
 }
 
 /**
@@ -117,14 +178,25 @@ export async function generatePresignedDownloadUrl(
  * @param key - The object key (file path) to delete
  */
 export async function deleteFromR2(key: string): Promise<void> {
+  r2Logger.debug('Deleting object from R2', { key });
   ensureServerSide();
   
-  const command = new DeleteObjectCommand({
-    Bucket: r2Config.bucketName,
-    Key: key,
-  });
+  try {
+    const command = new DeleteObjectCommand({
+      Bucket: r2Config.bucketName,
+      Key: key,
+    });
 
-  await r2Client!.send(command);
+    r2Logger.debug('Sending delete command to R2', { bucket: r2Config.bucketName, key });
+    await r2Client!.send(command);
+    r2Logger.debug('Object deleted successfully from R2', { key });
+  } catch (error) {
+    r2Logger.error('Failed to delete object from R2', { 
+      key, 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+    throw error;
+  }
 }
 
 /**

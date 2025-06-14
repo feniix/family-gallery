@@ -85,6 +85,7 @@ export const duplicateLogger = createLogger('DUPLICATE');
 export const exifLogger = createLogger('EXIF');
 export const r2Logger = createLogger('R2');
 export const authLogger = createLogger('AUTH');
+export const tagLogger = createLogger('TAG');
 
 // Export createLogger function for custom loggers
 export { createLogger }; 

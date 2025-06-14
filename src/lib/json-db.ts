@@ -69,7 +69,8 @@ export async function readJsonFile<T = any>(filename: string): Promise<T | null>
       name: error.name,
       code: error.code,
       httpStatusCode: error.$metadata?.httpStatusCode,
-      message: error.message
+      message: error.message,
+      stack: error.stack
     });
     
     // If file doesn't exist, return null
@@ -77,6 +78,11 @@ export async function readJsonFile<T = any>(filename: string): Promise<T | null>
       dbLogger.debug(`File does not exist: ${filename}`);
       return null;
     }
+    
+    dbLogger.error(`Rethrowing error for file: ${filename}`, { 
+      errorType: error.constructor.name,
+      isRetryable: error.name !== 'NoSuchKey' && error.$metadata?.httpStatusCode !== 404
+    });
     throw error;
   }
 }
@@ -88,18 +94,41 @@ export async function readJsonFile<T = any>(filename: string): Promise<T | null>
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function writeJsonFile<T = any>(filename: string, data: T): Promise<void> {
-  const client = ensureR2Client();
-  const key = generateFilePath.jsonData(filename);
-  const jsonString = JSON.stringify(data, null, 2);
+  try {
+    dbLogger.debug(`Attempting to write file: ${filename}`);
+    const client = ensureR2Client();
+    const key = generateFilePath.jsonData(filename);
+    dbLogger.debug(`Generated R2 key for write: ${key}`);
+    
+    const jsonString = JSON.stringify(data, null, 2);
+    dbLogger.debug(`JSON serialized`, { filename, contentLength: jsonString.length });
 
-  const command = new PutObjectCommand({
-    Bucket: r2Config.bucketName,
-    Key: key,
-    Body: jsonString,
-    ContentType: 'application/json',
-  });
+    const command = new PutObjectCommand({
+      Bucket: r2Config.bucketName,
+      Key: key,
+      Body: jsonString,
+      ContentType: 'application/json',
+    });
 
-  await client.send(command);
+    dbLogger.debug(`Sending PutObject command`, { bucket: r2Config.bucketName, key });
+    const response = await client.send(command);
+    dbLogger.debug(`PutObject response`, { 
+      filename, 
+      status: response.$metadata.httpStatusCode,
+      etag: response.ETag 
+    });
+    
+    dbLogger.debug(`Successfully wrote file: ${filename}`);
+  } catch (error: any) {
+    dbLogger.error(`Error writing file: ${filename}`, {
+      name: error.name,
+      code: error.code,
+      httpStatusCode: error.$metadata?.httpStatusCode,
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
 }
 
 /**
@@ -117,15 +146,25 @@ export async function updateJsonFile<T = any>(
 ): Promise<T> {
   const lockId = `json_${filename}`;
   
+  dbLogger.debug(`Starting atomic update for file`, { filename, lockId });
+  
   return await withLock(lockId, async () => {
+    dbLogger.debug(`Lock acquired for file update`, { filename, lockId });
+    
     // Read current data
+    dbLogger.debug(`Reading current data for update`, { filename });
     const currentData = await readJsonFile<T>(filename) ?? defaultValue;
+    dbLogger.debug(`Current data loaded`, { filename, hasData: !!currentData });
     
     // Apply update
+    dbLogger.debug(`Applying updater function`, { filename });
     const updatedData = updater(currentData);
+    dbLogger.debug(`Updater function completed`, { filename });
     
     // Write back to R2
+    dbLogger.debug(`Writing updated data back to R2`, { filename });
     await writeJsonFile(filename, updatedData);
+    dbLogger.debug(`Atomic update completed successfully`, { filename, lockId });
     
     return updatedData;
   });
@@ -141,16 +180,28 @@ export async function updateJsonFile<T = any>(
 export function createJsonDb<T = any>(filename: string, defaultValue: T): JsonDbOperation<T> {
   return {
     async read(): Promise<T> {
+      dbLogger.debug(`Reading JSON database`, { filename });
       const data = await readJsonFile<T>(filename);
-      return data ?? defaultValue;
+      const result = data ?? defaultValue;
+      dbLogger.debug(`JSON database read completed`, { 
+        filename, 
+        foundData: !!data,
+        usingDefault: !data
+      });
+      return result;
     },
 
     async write(data: T): Promise<void> {
+      dbLogger.debug(`Writing JSON database`, { filename });
       await writeJsonFile(filename, data);
+      dbLogger.debug(`JSON database write completed`, { filename });
     },
 
     async update(updater: (current: T) => T): Promise<T> {
-      return await updateJsonFile(filename, updater, defaultValue);
+      dbLogger.debug(`Updating JSON database`, { filename });
+      const result = await updateJsonFile(filename, updater, defaultValue);
+      dbLogger.debug(`JSON database update completed`, { filename });
+      return result;
     },
   };
 }
@@ -169,18 +220,37 @@ export async function withRetry<T>(
 ): Promise<T> {
   let lastError: Error | undefined;
 
+  dbLogger.debug(`Starting retry operation`, { maxRetries, baseDelayMs });
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await operation();
+      dbLogger.debug(`Retry attempt`, { attempt, maxRetries });
+      const result = await operation();
+      if (attempt > 0) {
+        dbLogger.info(`Retry operation succeeded`, { attempt, maxRetries });
+      }
+      return result;
     } catch (error) {
       lastError = error as Error;
       
+      dbLogger.warn(`Retry attempt failed`, { 
+        attempt, 
+        maxRetries, 
+        error: lastError.message,
+        errorType: lastError.constructor.name
+      });
+      
       if (attempt === maxRetries) {
+        dbLogger.error(`All retry attempts exhausted`, { 
+          maxRetries, 
+          finalError: lastError.message 
+        });
         break; // Don't delay on the last attempt
       }
 
       // Exponential backoff with jitter
       const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * 1000;
+      dbLogger.debug(`Waiting before retry`, { attempt, delay: Math.round(delay) });
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
