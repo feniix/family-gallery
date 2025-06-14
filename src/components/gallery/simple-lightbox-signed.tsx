@@ -43,7 +43,7 @@ export function SimpleLightboxSigned({
     enabled: isOpen
   });
 
-  const { url: thumbnailUrl, loading: thumbnailLoading } = useSignedUrl({
+  const { url: thumbnailUrl } = useSignedUrl({
     mediaId: media.id,
     isThumbnail: true,
     expiresIn: 3600, // 1 hour for thumbnails

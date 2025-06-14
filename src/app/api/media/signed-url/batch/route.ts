@@ -5,6 +5,14 @@ import { generatePresignedDownloadUrl } from '@/lib/r2';
 import { apiLogger } from '@/lib/logger';
 import { checkUserHasAccessSmart } from '@/lib/server-auth';
 
+interface MediaItem {
+  id: string;
+  originalFilename: string;
+  path: string;
+  thumbnailPath?: string;
+  type: string;
+}
+
 interface BatchSignedUrlRequest {
   requests: Array<{
     mediaId: string;
@@ -74,7 +82,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build media lookup map for efficient searching
-    const mediaMap = new Map<string, any>();
+    const mediaMap = new Map<string, MediaItem>();
     
     try {
       // Get the media index to know which years have data

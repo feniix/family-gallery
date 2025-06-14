@@ -55,7 +55,7 @@ export function useSignedUrl({
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const refreshTimeoutRef = useRef<NodeJS.Timeout>();
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Generate cache key
   const cacheKey = `${mediaId}_${isThumbnail ? 'thumb' : 'full'}`;

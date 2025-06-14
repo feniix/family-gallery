@@ -30,7 +30,6 @@ export function PhotoCardSigned({ media, onClick, priority = false, aspectRatio 
   });
 
   const isVideo = media.type === 'video';
-  const hasVideoThumbnail = isVideo && media.thumbnailPath;
 
   // Calculate aspect ratio class or style
   const getAspectRatioConfig = () => {

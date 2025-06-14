@@ -146,7 +146,7 @@ export function OptimizedPhotoGrid({
       {/* End of Results */}
       {!hasMore && media.length > 0 && (
         <div className="text-center py-8 text-gray-500">
-          <p>You've reached the end of the gallery</p>
+          <p>You&apos;ve reached the end of the gallery</p>
           <p className="text-sm mt-1">{media.length} photos total</p>
         </div>
       )}
