@@ -1,6 +1,7 @@
 /**
  * Authenticated API client utilities
  * Ensures all API calls include proper credentials for authentication
+ * Updated: 2025-06-14 - Force cache bust
  */
 
 export interface ApiResponse<T = unknown> {
