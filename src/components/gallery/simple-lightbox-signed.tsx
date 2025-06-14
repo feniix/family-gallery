@@ -36,17 +36,17 @@ export function SimpleLightboxSigned({
 
   // Get signed URLs for current media
   const { url: fullImageUrl, loading: fullImageLoading, error: fullImageError } = useSignedUrl({
-    mediaId: media.id,
+    mediaId: media?.id || '',
     isThumbnail: false,
     expiresIn: 7200, // 2 hours for full images
-    enabled: isOpen
+    enabled: isOpen && !!media?.id
   });
 
   const { url: thumbnailUrl } = useSignedUrl({
-    mediaId: media.id,
+    mediaId: media?.id || '',
     isThumbnail: true,
     expiresIn: 3600, // 1 hour for thumbnails
-    enabled: isOpen && media.type === 'video'
+    enabled: isOpen && media?.type === 'video' && !!media?.id
   });
 
   // Smart preloading for lightbox navigation
