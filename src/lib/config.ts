@@ -57,7 +57,10 @@ export const r2Config = {
   // Presigned URL expiration in seconds
   presignedUrlExpiration: parseInt(process.env.R2_PRESIGNED_URL_EXPIRATION || '900'), // Default: 15 minutes
   // Enable direct serving from R2 using signed URLs (default: false for backward compatibility)
-  useSignedUrls: process.env.R2_USE_SIGNED_URLS === 'true',
+  // Use NEXT_PUBLIC_ version for client-side access, fallback to server-side version
+  useSignedUrls: (typeof window !== 'undefined' 
+    ? process.env.NEXT_PUBLIC_R2_USE_SIGNED_URLS === 'true'
+    : process.env.R2_USE_SIGNED_URLS === 'true'),
 } as const;
 
 /**

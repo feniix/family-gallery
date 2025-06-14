@@ -35,8 +35,9 @@ The signed URL feature allows images to be served directly from Cloudflare R2, b
 Add to your `.env.local` or production environment:
 
 ```bash
-# Enable signed URLs
+# Enable signed URLs (both variables needed - server and client side)
 R2_USE_SIGNED_URLS=true
+NEXT_PUBLIC_R2_USE_SIGNED_URLS=true
 
 # Optional: Custom expiration time (default: 1 hour for thumbnails, 2 hours for full images)
 R2_PRESIGNED_URL_EXPIRATION=3600
@@ -110,7 +111,8 @@ const nextConfig: NextConfig = {
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `R2_USE_SIGNED_URLS` | `false` | Enable/disable signed URL serving |
+| `R2_USE_SIGNED_URLS` | `false` | Enable/disable signed URL serving (server-side) |
+| `NEXT_PUBLIC_R2_USE_SIGNED_URLS` | `false` | Enable/disable signed URL serving (client-side) |
 | `R2_PRESIGNED_URL_EXPIRATION` | `900` | Default expiration time in seconds |
 
 ### Automatic Expiration Management
