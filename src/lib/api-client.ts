@@ -19,7 +19,8 @@ export async function authenticatedFetch(
   options: RequestInit = {}
 ): Promise<Response> {
   console.log('🔐 authenticatedFetch called:', url, { credentials: 'include' });
-  return fetch(url, {
+  
+  const response = await fetch(url, {
     ...options,
     credentials: 'include',
     headers: {
@@ -27,6 +28,11 @@ export async function authenticatedFetch(
       ...options.headers,
     },
   });
+  
+  console.log('🔐 Response status:', response.status, response.statusText);
+  console.log('🔐 Response headers:', Object.fromEntries(response.headers.entries()));
+  
+  return response;
 }
 
 /**
