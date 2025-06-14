@@ -3,7 +3,7 @@
  * Ensures all API calls include proper credentials for authentication
  */
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   ok: boolean;
   status: number;
   data?: T;
@@ -30,7 +30,7 @@ export async function authenticatedFetch(
 /**
  * GET request with authentication
  */
-export async function apiGet<T = any>(url: string): Promise<ApiResponse<T>> {
+export async function apiGet<T = unknown>(url: string): Promise<ApiResponse<T>> {
   try {
     const response = await authenticatedFetch(url);
     
@@ -57,9 +57,9 @@ export async function apiGet<T = any>(url: string): Promise<ApiResponse<T>> {
 /**
  * POST request with authentication
  */
-export async function apiPost<T = any>(
+export async function apiPost<T = unknown>(
   url: string, 
-  body?: any
+  body?: unknown
 ): Promise<ApiResponse<T>> {
   try {
     const response = await authenticatedFetch(url, {
@@ -90,9 +90,9 @@ export async function apiPost<T = any>(
 /**
  * PUT request with authentication
  */
-export async function apiPut<T = any>(
+export async function apiPut<T = unknown>(
   url: string, 
-  body?: any
+  body?: unknown
 ): Promise<ApiResponse<T>> {
   try {
     const response = await authenticatedFetch(url, {
@@ -123,7 +123,7 @@ export async function apiPut<T = any>(
 /**
  * DELETE request with authentication
  */
-export async function apiDelete<T = any>(url: string): Promise<ApiResponse<T>> {
+export async function apiDelete<T = unknown>(url: string): Promise<ApiResponse<T>> {
   try {
     const response = await authenticatedFetch(url, {
       method: 'DELETE',
