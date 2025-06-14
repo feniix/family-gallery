@@ -157,10 +157,22 @@ export class MediaMemoryManager {
 
   /**
    * Pre-load images for better performance
+   * Note: Disabled when using signed URLs as preloading should be handled by the signed URL components
    */
   preloadImages(mediaItems: MediaMetadata[], priorityIndexes: number[] = []) {
     const monitor = PerformanceMonitor.getInstance();
     const startTime = performance.now();
+
+    // Skip preloading when using signed URLs - let the components handle it
+    // Check if signed URLs are enabled (avoid circular import by checking env directly)
+    const useSignedUrls = (typeof window !== 'undefined' 
+      ? process.env.NEXT_PUBLIC_R2_USE_SIGNED_URLS === 'true'
+      : process.env.R2_USE_SIGNED_URLS === 'true');
+    
+    if (useSignedUrls) {
+      monitor.logPerformance('preloadImages', startTime);
+      return;
+    }
 
     // Prioritize specific indexes first
     const priorityItems = priorityIndexes.map(index => mediaItems[index]).filter(Boolean);

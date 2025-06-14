@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useInView } from 'react-intersection-observer';
-import { PhotoCard } from './photo-card';
+import { PhotoCardWrapper } from './photo-card-wrapper';
 import { PhotoGridSkeleton } from '@/components/ui/image-skeleton';
 import { MediaMetadata } from '@/types/media';
 import { toast } from 'sonner';
@@ -207,7 +207,7 @@ export function PhotoGrid({
       <div className="columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4 space-y-4">
         {media.map((item, index) => (
           <div key={item.id} className="break-inside-avoid mb-4">
-            <PhotoCard
+            <PhotoCardWrapper
               media={item}
               onClick={() => onPhotoClick(item, index)}
               priority={index < 8} // Prioritize first 8 images

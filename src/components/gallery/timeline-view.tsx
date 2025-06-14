@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useInView } from 'react-intersection-observer';
-import { PhotoCard } from './photo-card';
+import { PhotoCardWrapper } from './photo-card-wrapper';
 import { DateHeader } from './date-header';
-import { SimpleLightbox } from './simple-lightbox';
+import { SimpleLightboxWrapper } from './simple-lightbox-wrapper';
 import { PhotoGridSkeleton } from '@/components/ui/image-skeleton';
 import { MediaMetadata } from '@/types/media';
 import { toast } from 'sonner';
@@ -313,7 +313,7 @@ export function TimelineView({
           <div className="columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4 space-y-4">
             {group.media.map((item, photoIndex) => (
               <div key={item.id} className="break-inside-avoid mb-4">
-                <PhotoCard
+                <PhotoCardWrapper
                   media={item}
                   onClick={() => handlePhotoClick(item, groupIndex, photoIndex)}
                   priority={groupIndex === 0 && photoIndex < 8} // Prioritize first group's first 8 images
@@ -353,7 +353,7 @@ export function TimelineView({
       )}
 
       {/* Enhanced Lightbox */}
-      <SimpleLightbox
+      <SimpleLightboxWrapper
         media={selectedMedia!}
         allMedia={media}
         currentIndex={selectedIndex}
