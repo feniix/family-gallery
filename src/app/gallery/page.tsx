@@ -28,6 +28,7 @@ import { SearchBar } from '@/components/gallery/search-bar';
 import { SimpleLightbox } from '@/components/gallery/simple-lightbox';
 import { MediaMetadata } from '@/types/media';
 import { isLowPerformanceDevice } from '@/lib/performance';
+import { R2ConfigDebug } from '@/components/debug/r2-config-debug';
 
 export default function GalleryPage() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -252,6 +253,9 @@ export default function GalleryPage() {
           onNext={handleNext}
         />
       )}
+
+      {/* Debug Component - Remove in production */}
+      <R2ConfigDebug />
     </div>
   );
 } 
