@@ -18,6 +18,7 @@ export async function authenticatedFetch(
   url: string, 
   options: RequestInit = {}
 ): Promise<Response> {
+  console.log('🔐 authenticatedFetch called:', url, { credentials: 'include' });
   return fetch(url, {
     ...options,
     credentials: 'include',
