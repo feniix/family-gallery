@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MediaMetadata } from '@/types/media';
 import { useSignedUrl } from '@/hooks/use-signed-url';
 import { useIntersectionObserver } from '@/hooks/use-intersection-observer';
@@ -27,6 +27,20 @@ export function PhotoCardSigned({ media, onClick, priority = false, aspectRatio 
     expiresIn: 3600, // 1 hour
     enabled: priority || isIntersecting // Load immediately if priority, otherwise when visible
   });
+
+  // Debug logging
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('PhotoCardSigned:', {
+        mediaId: media.id,
+        thumbnailUrl: thumbnailUrl ? 'URL received' : 'No URL',
+        thumbnailLoading,
+        thumbnailError: thumbnailError ? (typeof thumbnailError === 'string' ? thumbnailError : 'Unknown error') : null,
+        priority,
+        isIntersecting
+      });
+    }
+  }, [media.id, thumbnailUrl, thumbnailLoading, thumbnailError, priority, isIntersecting]);
 
   const isVideo = media.type === 'video';
 
@@ -126,7 +140,15 @@ export function PhotoCardSigned({ media, onClick, priority = false, aspectRatio 
         alt={media.originalFilename}
         className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
         loading={priority ? 'eager' : 'lazy'}
-        onError={() => setImageError(true)}
+        onError={(e) => {
+          console.error('Image load error:', {
+            mediaId: media.id,
+            src: thumbnailUrl,
+            error: e
+          });
+          setImageError(true);
+        }}
+        crossOrigin="anonymous" // Important for CORS with signed URLs
       />
 
       {/* Video Play Overlay */}

@@ -16,6 +16,8 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+    // Disable image optimization since we're using signed URLs
+    unoptimized: true,
   },
   // Production optimizations
   experimental: {

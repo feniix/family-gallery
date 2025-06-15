@@ -36,7 +36,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import Image from 'next/image';
 import { 
   Trash2, 
   Calendar, 
@@ -47,8 +46,9 @@ import {
   CheckSquare,
   Square,
   Eye,
-  Play,
+  Play
 } from 'lucide-react';
+import { PhotoCardSigned } from '@/components/gallery/photo-card-signed';
 import { BulkUploadZone } from '@/components/admin/bulk-upload-zone';
 import { SimpleLightbox } from '@/components/gallery/simple-lightbox';
 import type { MediaMetadata } from '@/types/media';
@@ -793,33 +793,22 @@ export default function MediaManagerPage() {
                           </div>
                         )}
                         
-                                                 {/* Media Thumbnail */}
-                         {media.type === 'photo' ? (
-                           <Image
-                             src={`/api/media/download/${media.id}/thumbnail`}
-                             alt={media.originalFilename}
-                             fill
-                             className="object-cover group-hover:scale-105 transition-transform duration-200"
-                             sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                           />
-                         ) : (
-                           <Image
-                             src={`/api/media/download/${media.id}/thumbnail`}
-                             alt={media.originalFilename}
-                             fill
-                             className="object-cover group-hover:scale-105 transition-transform duration-200"
-                             sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                             onError={(e) => {
-                               // Fallback to video icon if thumbnail fails
-                               const target = e.target as HTMLImageElement;
-                               target.style.display = 'none';
-                               const parent = target.parentElement;
-                               if (parent) {
-                                 parent.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-gray-200"><svg class="h-12 w-12 text-gray-400" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>';
-                               }
-                             }}
-                           />
-                         )}
+                          {/* Media Thumbnail with signed URL support */}
+                          {media.type === 'photo' ? (
+                            <PhotoCardSigned
+                              media={media}
+                              onClick={() => handleOpenLightbox(media)}
+                              aspectRatio="square"
+                            />
+                          ) : (
+                            <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                              <PhotoCardSigned
+                                media={media}
+                                onClick={() => handleOpenLightbox(media)}
+                                aspectRatio="square"
+                              />
+                            </div>
+                          )}
                         
                         {/* Overlay for video */}
                         {media.type === 'video' && (

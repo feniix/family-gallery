@@ -9,7 +9,12 @@ export const r2Config = {
   accessKeyId: typeof window === 'undefined' ? process.env.R2_ACCESS_KEY_ID! : '',
   secretAccessKey: typeof window === 'undefined' ? process.env.R2_SECRET_ACCESS_KEY! : '',
   bucketName: typeof window === 'undefined' ? process.env.R2_BUCKET_NAME! : '',
-  publicUrl: typeof window === 'undefined' ? process.env.R2_PUBLIC_URL : '', // Optional
+  publicUrl: typeof window === 'undefined' ? process.env.R2_PUBLIC_URL : '',
+  useSignedUrls: process.env.NEXT_PUBLIC_R2_USE_SIGNED_URLS === 'true',
+  endpoint: typeof window === 'undefined' ? process.env.R2_ENDPOINT || `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : '',
+  region: 'auto',
+  // Add forcePathStyle for custom domains
+  forcePathStyle: true,
 };
 
 // Validate R2 configuration function - called when actually needed
@@ -49,6 +54,7 @@ export const r2Client = typeof window === 'undefined'
             const client = new S3Client({
               region: 'auto',
               endpoint,
+              forcePathStyle: r2Config.forcePathStyle,
               credentials: {
                 accessKeyId: r2Config.accessKeyId,
                 secretAccessKey: r2Config.secretAccessKey,
@@ -150,46 +156,100 @@ export async function generatePresignedDownloadUrl(
   key: string,
   expiresIn: number = 3600 // 1 hour
 ): Promise<string> {
-  r2Logger.debug('Generating presigned download URL', { key, expiresIn });
+  r2Logger.debug('Generating presigned download URL', { 
+    key, 
+    expiresIn,
+    useSignedUrls: r2Config.useSignedUrls,
+    publicUrl: r2Config.publicUrl ? 'configured' : 'not configured'
+  });
+  
   ensureServerSide();
   
+  // If we're not using signed URLs, return the public URL directly
+  if (!r2Config.useSignedUrls) {
+    if (r2Config.publicUrl) {
+      // Ensure the key doesn't start with a slash to avoid double slashes
+      const cleanKey = key.startsWith('/') ? key.substring(1) : key;
+      const publicUrl = `${r2Config.publicUrl}/${cleanKey}`;
+      r2Logger.debug('Using public URL directly (signed URLs disabled)', { 
+        publicUrl,
+        originalKey: key,
+        cleanKey
+      });
+      return publicUrl;
+    }
+    throw new Error('Public URL not configured but signed URLs are disabled');
+  }
+
   try {
     const command = new GetObjectCommand({
       Bucket: r2Config.bucketName,
       Key: key,
     });
 
-    r2Logger.debug('Creating presigned download command', { bucket: r2Config.bucketName, key });
-    const presignedUrl = await getSignedUrl(r2Client!, command, { expiresIn });
+    r2Logger.debug('Creating presigned download command', { 
+      bucket: r2Config.bucketName, 
+      key,
+      endpoint: r2Config.endpoint,
+      region: r2Config.region,
+      forcePathStyle: r2Config.forcePathStyle
+    });
+    
+    // Generate the signed URL with the correct options
+    const presignedUrl = await getSignedUrl(r2Client!, command, { 
+      expiresIn,
+      // Signing options for AWS SDK v3
+      signableHeaders: new Set(['host']),
+      // Use the region from config
+      signingRegion: r2Config.region,
+      signingService: 's3',
+    });
     
     // Replace default R2 endpoint with custom domain if configured
     let finalUrl = presignedUrl;
-    r2Logger.debug('Custom domain replacement check', {
-      hasPublicUrl: !!r2Config.publicUrl,
-      publicUrl: r2Config.publicUrl,
-      originalUrl: presignedUrl.substring(0, 100) + '...',
-      key
-    });
     
     if (r2Config.publicUrl) {
-      // The signed URL includes the bucket name in the hostname
-      const defaultEndpoint = `https://${r2Config.bucketName}.${r2Config.accountId}.r2.cloudflarestorage.com`;
-      finalUrl = presignedUrl.replace(defaultEndpoint, r2Config.publicUrl);
-      r2Logger.debug('Replaced R2 endpoint with custom domain', { 
-        originalEndpoint: defaultEndpoint,
-        customDomain: r2Config.publicUrl,
-        originalUrl: presignedUrl.substring(0, 100) + '...',
-        finalUrl: finalUrl.substring(0, 100) + '...',
-        key 
-      });
+      try {
+        // Parse the signed URL to extract the path and query parameters
+        const url = new URL(presignedUrl);
+        const path = url.pathname + url.search;
+        
+        // Remove any trailing slashes from the public URL
+        const cleanPublicUrl = r2Config.publicUrl.replace(/\/+$/, '');
+        
+        // Construct the new URL with the custom domain
+        finalUrl = `${cleanPublicUrl}${path}`;
+        
+        r2Logger.debug('Generated custom domain URL', { 
+          originalUrl: presignedUrl,
+          customDomain: cleanPublicUrl,
+          finalUrl,
+          key,
+          path
+        });
+      } catch (error) {
+        r2Logger.error('Error generating custom domain URL', {
+          error: error instanceof Error ? error.message : String(error),
+          presignedUrl,
+          publicUrl: r2Config.publicUrl,
+          key
+        });
+        // Fall back to the original signed URL if there was an error
+        finalUrl = presignedUrl;
+      }
     } else {
       r2Logger.warn('No custom domain configured, using default R2 endpoint', {
-        publicUrl: r2Config.publicUrl,
+        presignedUrl,
         key
       });
     }
     
-    r2Logger.debug('Presigned download URL generated successfully', { key, urlLength: finalUrl.length });
+    r2Logger.debug('Presigned download URL generated successfully', { 
+      key, 
+      urlLength: finalUrl.length,
+      expiresIn,
+      finalUrl: finalUrl.substring(0, 100) + (finalUrl.length > 100 ? '...' : '')
+    });
     
     return finalUrl;
   } catch (error) {

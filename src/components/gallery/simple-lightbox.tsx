@@ -7,6 +7,7 @@ import { MediaMetadata } from '@/types/media';
 import { format } from 'date-fns';
 import { getVideoMimeType } from '@/lib/video-processing';
 import { createLogger } from '@/lib/logger';
+import { useSignedUrl } from '@/hooks/use-signed-url';
 
 interface SimpleLightboxProps {
   media: MediaMetadata;
@@ -37,6 +38,18 @@ export function SimpleLightbox({
 }: SimpleLightboxProps) {
   const [imageDimensions, setImageDimensions] = useState<ImageDimensions | null>(null);
   const [imageLoading, setImageLoading] = useState(true);
+
+  const { url: mediaUrl, loading: mediaLoading } = useSignedUrl({
+    mediaId: media.id,
+    isThumbnail: false,
+    expiresIn: 86400 // 24 hours for lightbox
+  });
+
+  const { url: thumbnailUrl } = useSignedUrl({
+    mediaId: media.id,
+    isThumbnail: true,
+    expiresIn: 86400 // 24 hours for lightbox
+  });
 
   // Auto-detect image dimensions when media changes
   useEffect(() => {
@@ -91,9 +104,17 @@ export function SimpleLightbox({
         setImageLoading(false);
       };
 
-      img.src = `/api/media/download/${media.id}`;
+      if (mediaUrl) {
+        img.src = mediaUrl;
+      } else {
+        lightboxLogger.warn('Media URL is null, cannot load image dimensions', { 
+          mediaId: media.id,
+          originalFilename: media.originalFilename
+        });
+        setImageLoading(false);
+      }
     }
-  }, [media, isOpen]);
+  }, [media, isOpen, mediaUrl]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -118,6 +139,14 @@ export function SimpleLightbox({
   }, [isOpen, currentIndex, allMedia.length, onClose, onNext, onPrevious]);
 
   if (!isOpen || !media) return null;
+
+  if (mediaLoading) {
+    return (
+      <div className="flex items-center justify-center w-full h-full bg-gray-100">
+        <div className="w-12 h-12 border-4 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   const isVideo = media.type === 'video';
 
@@ -188,17 +217,23 @@ export function SimpleLightbox({
       {/* Main Content */}
       <div className="flex items-center justify-center w-full h-full p-8">
         {isVideo ? (
-          <video
-            controls
-            autoPlay
-            className="max-w-full max-h-full object-contain"
-            poster={`/api/media/download/${media.id}/thumbnail`}
-          >
-            <source src={`/api/media/download/${media.id}`} type={getVideoMimeType(media.originalFilename)} />
-            <source src={`/api/media/download/${media.id}`} type="video/mp4" />
-            <source src={`/api/media/download/${media.id}`} type="video/webm" />
-            Your browser does not support the video tag.
-          </video>
+          mediaUrl ? (
+            <video
+              controls
+              autoPlay
+              className="max-w-full max-h-full object-contain"
+              poster={thumbnailUrl || undefined}
+            >
+              <source src={mediaUrl} type={getVideoMimeType(media.originalFilename)} />
+              <source src={mediaUrl} type="video/mp4" />
+              <source src={mediaUrl} type="video/webm" />
+              Your browser does not support the video tag.
+            </video>
+          ) : (
+            <div className="p-8 text-center text-gray-500">
+              <p>Failed to load video URL</p>
+            </div>
+          )
         ) : (
           <div 
             className="relative flex items-center justify-center"
@@ -209,18 +244,24 @@ export function SimpleLightbox({
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
               </div>
             )}
-            <Image
-              src={`/api/media/download/${media.id}`}
-              alt={media.originalFilename}
-              width={imageDimensions?.width || 1600}
-              height={imageDimensions?.height || 1200}
-              className="object-contain w-full h-full"
-              priority
-              style={{
-                aspectRatio: imageDimensions?.aspectRatio || 'auto'
-              }}
-              onLoad={() => setImageLoading(false)}
-            />
+            {mediaUrl ? (
+              <Image
+                src={mediaUrl}
+                alt={media.originalFilename}
+                width={imageDimensions?.width || 1600}
+                height={imageDimensions?.height || 1200}
+                className="object-contain w-full h-full"
+                priority
+                onLoad={() => setImageLoading(false)}
+                style={{
+                  aspectRatio: imageDimensions?.aspectRatio || 'auto'
+                }}
+              />
+            ) : (
+              <div className="p-8 text-center text-gray-500">
+                <p>Failed to load image URL</p>
+              </div>
+            )}
           </div>
         )}
       </div>
