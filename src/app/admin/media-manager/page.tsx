@@ -48,7 +48,7 @@ import {
   Eye,
   Play
 } from 'lucide-react';
-import { PhotoCardSigned } from '@/components/gallery/photo-card-signed';
+import { PhotoCard } from '@/components/gallery/photo-card';
 import { BulkUploadZone } from '@/components/admin/bulk-upload-zone';
 import { SimpleLightbox } from '@/components/gallery/simple-lightbox';
 import type { MediaMetadata } from '@/types/media';
@@ -795,14 +795,14 @@ export default function MediaManagerPage() {
                         
                           {/* Media Thumbnail with signed URL support */}
                           {media.type === 'photo' ? (
-                            <PhotoCardSigned
+                            <PhotoCard
                               media={media}
                               onClick={() => handleOpenLightbox(media)}
                               aspectRatio="square"
                             />
                           ) : (
                             <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                              <PhotoCardSigned
+                              <PhotoCard
                                 media={media}
                                 onClick={() => handleOpenLightbox(media)}
                                 aspectRatio="square"

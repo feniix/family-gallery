@@ -93,7 +93,8 @@ export function useSignedUrl({
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to get signed URL: ${response.status}`);
+        const errorText = await response.text().catch(() => 'Unknown error');
+        throw new Error(`Failed to get signed URL (${response.status}): ${errorText}`);
       }
 
       const data: SignedUrlResponse = await response.json();

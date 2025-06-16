@@ -10,7 +10,7 @@ export const r2Config = {
   secretAccessKey: typeof window === 'undefined' ? process.env.R2_SECRET_ACCESS_KEY! : '',
   bucketName: typeof window === 'undefined' ? process.env.R2_BUCKET_NAME! : '',
   publicUrl: typeof window === 'undefined' ? process.env.R2_PUBLIC_URL : '',
-  useSignedUrls: process.env.NEXT_PUBLIC_R2_USE_SIGNED_URLS === 'true',
+  useSignedUrls: true, // Always use signed URLs
   endpoint: typeof window === 'undefined' ? process.env.R2_ENDPOINT || `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : '',
   region: 'auto',
   // Add forcePathStyle for custom domains
@@ -165,21 +165,7 @@ export async function generatePresignedDownloadUrl(
   
   ensureServerSide();
   
-  // If we're not using signed URLs, return the public URL directly
-  if (!r2Config.useSignedUrls) {
-    if (r2Config.publicUrl) {
-      // Ensure the key doesn't start with a slash to avoid double slashes
-      const cleanKey = key.startsWith('/') ? key.substring(1) : key;
-      const publicUrl = `${r2Config.publicUrl}/${cleanKey}`;
-      r2Logger.debug('Using public URL directly (signed URLs disabled)', { 
-        publicUrl,
-        originalKey: key,
-        cleanKey
-      });
-      return publicUrl;
-    }
-    throw new Error('Public URL not configured but signed URLs are disabled');
-  }
+  // Always use signed URLs
 
   try {
     const command = new GetObjectCommand({
@@ -212,7 +198,13 @@ export async function generatePresignedDownloadUrl(
       try {
         // Parse the signed URL to extract the path and query parameters
         const url = new URL(presignedUrl);
-        const path = url.pathname + url.search;
+        let path = url.pathname + url.search;
+        
+        // Remove bucket name from path if it's present (due to forcePathStyle)
+        // The path will be like: /bucket-name/actual/file/path
+        if (path.startsWith(`/${r2Config.bucketName}/`)) {
+          path = path.substring(`/${r2Config.bucketName}`.length);
+        }
         
         // Remove any trailing slashes from the public URL
         const cleanPublicUrl = r2Config.publicUrl.replace(/\/+$/, '');
@@ -225,7 +217,8 @@ export async function generatePresignedDownloadUrl(
           customDomain: cleanPublicUrl,
           finalUrl,
           key,
-          path
+          path,
+          bucketName: r2Config.bucketName
         });
       } catch (error) {
         r2Logger.error('Error generating custom domain URL', {
@@ -287,19 +280,7 @@ export async function deleteFromR2(key: string): Promise<void> {
   }
 }
 
-/**
- * Generate a public URL for an object in R2
- * @deprecated This function is not used since the app uses authenticated API routes
- * @param key - The object key (file path) in R2
- * @returns Public URL (if bucket is public) or custom domain URL
- */
-export function getPublicUrl(key: string): string {
-  const publicUrl = typeof window === 'undefined' ? r2Config.publicUrl : process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
-  if (!publicUrl) {
-    throw new Error('R2 public URL not configured - but this function should not be used anyway');
-  }
-  return `${publicUrl}/${key}`;
-}
+
 
 /**
  * Generate file paths for different types of content

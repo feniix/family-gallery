@@ -1,13 +1,10 @@
-'use client';
-
-import React, { useState, useEffect } from 'react';
-import Image from 'next/image';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { MediaMetadata } from '@/types/media';
-import { format } from 'date-fns';
-import { getVideoMimeType } from '@/lib/video-processing';
-import { createLogger } from '@/lib/logger';
 import { useSignedUrl } from '@/hooks/use-signed-url';
+import { useSmartPreloading } from '@/hooks/use-smart-preloading';
+import { createLogger } from '@/lib/logger';
+
+const lightboxLogger = createLogger('LIGHTBOX');
 
 interface SimpleLightboxProps {
   media: MediaMetadata;
@@ -25,8 +22,6 @@ interface ImageDimensions {
   aspectRatio: number;
 }
 
-const lightboxLogger = createLogger('LIGHTBOX');
-
 export function SimpleLightbox({
   media,
   allMedia,
@@ -39,26 +34,37 @@ export function SimpleLightbox({
   const [imageDimensions, setImageDimensions] = useState<ImageDimensions | null>(null);
   const [imageLoading, setImageLoading] = useState(true);
 
-  const { url: mediaUrl, loading: mediaLoading } = useSignedUrl({
-    mediaId: media.id,
+  // Get signed URLs for current media
+  const { url: fullImageUrl, loading: fullImageLoading, error: fullImageError } = useSignedUrl({
+    mediaId: media?.id || '',
     isThumbnail: false,
-    expiresIn: 86400 // 24 hours for lightbox
+    expiresIn: 7200, // 2 hours for full images
+    enabled: isOpen && !!media?.id
   });
 
   const { url: thumbnailUrl } = useSignedUrl({
-    mediaId: media.id,
+    mediaId: media?.id || '',
     isThumbnail: true,
-    expiresIn: 86400 // 24 hours for lightbox
+    expiresIn: 3600, // 1 hour for thumbnails
+    enabled: isOpen && media?.type === 'video' && !!media?.id
   });
 
-  // Auto-detect image dimensions when media changes
+  // Smart preloading for lightbox navigation
+  useSmartPreloading({
+    allMedia,
+    currentIndex,
+    preloadCount: 6, // Preload 3 images before and after current
+    enabled: isOpen
+  });
+
+  // Calculate image dimensions and aspect ratio
   useEffect(() => {
-    if (!isOpen || !media || media.type === 'video') return;
+    if (!isOpen || !media) return;
 
     setImageLoading(true);
     setImageDimensions(null);
 
-    // First try to use metadata if available
+    // Use metadata if available
     if (media.metadata?.width && media.metadata?.height) {
       const aspectRatio = media.metadata.width / media.metadata.height;
       lightboxLogger.debug('Using metadata dimensions', { 
@@ -73,7 +79,7 @@ export function SimpleLightbox({
         aspectRatio
       });
       setImageLoading(false);
-    } else {
+    } else if (fullImageUrl && media.type === 'photo') {
       // If no metadata, load image to get natural dimensions
       const img = new window.Image();
       img.onload = () => {
@@ -104,17 +110,17 @@ export function SimpleLightbox({
         setImageLoading(false);
       };
 
-      if (mediaUrl) {
-        img.src = mediaUrl;
-      } else {
-        lightboxLogger.warn('Media URL is null, cannot load image dimensions', { 
-          mediaId: media.id,
-          originalFilename: media.originalFilename
-        });
-        setImageLoading(false);
-      }
+      img.src = fullImageUrl;
+    } else {
+      // Fallback dimensions
+      setImageDimensions({
+        width: 800,
+        height: 600,
+        aspectRatio: 4/3
+      });
+      setImageLoading(false);
     }
-  }, [media, isOpen, mediaUrl]);
+  }, [media, isOpen, fullImageUrl]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -140,165 +146,174 @@ export function SimpleLightbox({
 
   if (!isOpen || !media) return null;
 
-  if (mediaLoading) {
-    return (
-      <div className="flex items-center justify-center w-full h-full bg-gray-100">
-        <div className="w-12 h-12 border-4 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
   const isVideo = media.type === 'video';
 
-  // Calculate container styles to preserve aspect ratio
-  const getImageContainerStyle = () => {
+  // Calculate container dimensions to fit within viewport
+  const getContainerStyle = () => {
     if (!imageDimensions) return {};
+
+    const maxWidth = Math.min(window.innerWidth * 0.9, 1600);
+    const maxHeight = Math.min(window.innerHeight * 0.8, 1200);
     
-    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
-    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
-    
-    // Use 90% of viewport with some padding
-    const maxWidth = Math.min(viewportWidth * 0.9, 1400);
-    const maxHeight = Math.min(viewportHeight * 0.85, 1000);
-    
-    // Calculate dimensions that fit within viewport while preserving aspect ratio
-    let displayWidth = imageDimensions.width;
-    let displayHeight = imageDimensions.height;
+    let { width, height } = imageDimensions;
     
     // Scale down if too large
-    if (displayWidth > maxWidth) {
-      displayHeight = (displayHeight * maxWidth) / displayWidth;
-      displayWidth = maxWidth;
+    if (width > maxWidth) {
+      height = (height * maxWidth) / width;
+      width = maxWidth;
     }
     
-    if (displayHeight > maxHeight) {
-      displayWidth = (displayWidth * maxHeight) / displayHeight;
-      displayHeight = maxHeight;
+    if (height > maxHeight) {
+      width = (width * maxHeight) / height;
+      height = maxHeight;
     }
-    
+
     return {
-      width: displayWidth,
-      height: displayHeight,
-      aspectRatio: imageDimensions.aspectRatio
+      width: `${width}px`,
+      height: `${height}px`,
+      maxWidth: '90vw',
+      maxHeight: '80vh'
     };
   };
 
-  const containerStyle = getImageContainerStyle();
+  const containerStyle = getContainerStyle();
+
+  const getVideoMimeType = (filename: string): string => {
+    const ext = filename.toLowerCase().split('.').pop();
+    switch (ext) {
+      case 'mp4': return 'video/mp4';
+      case 'mov': return 'video/quicktime';
+      case 'avi': return 'video/x-msvideo';
+      case 'webm': return 'video/webm';
+      default: return 'video/mp4';
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[2001]">
-      {/* Close Button */}
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center">
+      {/* Close button */}
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-full transition-colors"
+        className="absolute top-4 right-4 z-10 text-white hover:text-gray-300 transition-colors"
+        aria-label="Close lightbox"
       >
-        <X className="h-6 w-6 text-white" />
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
       </button>
 
-      {/* Navigation Buttons */}
+      {/* Navigation buttons */}
       {currentIndex > 0 && (
         <button
           onClick={onPrevious}
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-full transition-colors"
+          className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 text-white hover:text-gray-300 transition-colors"
+          aria-label="Previous image"
         >
-          <ChevronLeft className="h-6 w-6 text-white" />
+          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
         </button>
       )}
 
       {currentIndex < allMedia.length - 1 && (
         <button
           onClick={onNext}
-          className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-full transition-colors"
+          className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 text-white hover:text-gray-300 transition-colors"
+          aria-label="Next image"
         >
-          <ChevronRight className="h-6 w-6 text-white" />
+          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
         </button>
       )}
 
-      {/* Main Content */}
+      {/* Main content area */}
       <div className="flex items-center justify-center w-full h-full p-8">
-        {isVideo ? (
-          mediaUrl ? (
-            <video
-              controls
-              autoPlay
-              className="max-w-full max-h-full object-contain"
-              poster={thumbnailUrl || undefined}
-            >
-              <source src={mediaUrl} type={getVideoMimeType(media.originalFilename)} />
-              <source src={mediaUrl} type="video/mp4" />
-              <source src={mediaUrl} type="video/webm" />
-              Your browser does not support the video tag.
-            </video>
-          ) : (
-            <div className="p-8 text-center text-gray-500">
-              <p>Failed to load video URL</p>
-            </div>
-          )
-        ) : (
-          <div 
-            className="relative flex items-center justify-center"
-            style={containerStyle}
-          >
-            {imageLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-800 rounded">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-              </div>
-            )}
-            {mediaUrl ? (
-              <Image
-                src={mediaUrl}
-                alt={media.originalFilename}
-                width={imageDimensions?.width || 1600}
-                height={imageDimensions?.height || 1200}
-                className="object-contain w-full h-full"
-                priority
-                onLoad={() => setImageLoading(false)}
-                style={{
-                  aspectRatio: imageDimensions?.aspectRatio || 'auto'
-                }}
-              />
-            ) : (
-              <div className="p-8 text-center text-gray-500">
-                <p>Failed to load image URL</p>
-              </div>
-            )}
+        {/* Loading state */}
+        {(fullImageLoading || imageLoading) && (
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
           </div>
+        )}
+
+        {/* Error state */}
+        {fullImageError && !fullImageLoading && (
+          <div className="text-center text-white">
+            <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <p className="text-lg mb-2">Failed to load media</p>
+            <p className="text-sm text-gray-400">{media.originalFilename}</p>
+          </div>
+        )}
+
+        {/* Media content */}
+        {!fullImageLoading && !fullImageError && fullImageUrl && (
+          <>
+            {isVideo ? (
+              <video
+                controls
+                autoPlay
+                className="max-w-full max-h-full object-contain"
+                poster={thumbnailUrl || undefined}
+              >
+                <source src={fullImageUrl} type={getVideoMimeType(media.originalFilename)} />
+                <source src={fullImageUrl} type="video/mp4" />
+                <source src={fullImageUrl} type="video/webm" />
+                Your browser does not support the video tag.
+              </video>
+            ) : (
+              <div 
+                className="relative flex items-center justify-center"
+                style={containerStyle}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={fullImageUrl}
+                  alt={media.originalFilename}
+                  className="object-contain w-full h-full"
+                  style={{
+                    aspectRatio: imageDimensions?.aspectRatio || 'auto'
+                  }}
+                  onLoad={() => setImageLoading(false)}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Metadata Panel */}
-      <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-sm text-white p-4 rounded-lg">
-        <div className="space-y-2 text-sm">
-          <div className="font-semibold">{media.originalFilename}</div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <span className="text-gray-300">Taken:</span> {format(new Date(media.takenAt), 'PPp')}
-            </div>
-            <div>
-              <span className="text-gray-300">Size:</span> {Math.round((media.metadata?.size || 0) / 1024 / 1024 * 100) / 100} MB
-            </div>
-            {imageDimensions && (
-              <div>
-                <span className="text-gray-300">Dimensions:</span> {imageDimensions.width} × {imageDimensions.height}
-              </div>
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-6">
+        <div className="text-white">
+          <h3 className="text-lg font-medium mb-2">{media.originalFilename}</h3>
+          <div className="flex flex-wrap gap-4 text-sm text-gray-300">
+            <span>{new Date(media.takenAt).toLocaleDateString()}</span>
+            {media.metadata?.width && media.metadata?.height && (
+              <span>{media.metadata.width} × {media.metadata.height}</span>
             )}
-            {media.metadata?.camera && (
-              <div>
-                <span className="text-gray-300">Camera:</span> {media.metadata.camera}
-              </div>
+            {media.metadata?.size && (
+              <span>{(media.metadata.size / 1024 / 1024).toFixed(1)} MB</span>
             )}
-            {imageDimensions && (
-              <div>
-                <span className="text-gray-300">Aspect Ratio:</span> {imageDimensions.aspectRatio.toFixed(2)}:1
-              </div>
+            {isVideo && media.metadata?.duration && (
+              <span>{Math.round(media.metadata.duration)}s</span>
             )}
           </div>
+          {media.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {media.tags.map(tag => (
+                <span key={tag} className="bg-white bg-opacity-20 px-2 py-1 rounded text-xs">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Image Counter */}
-      <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded text-sm">
-        {currentIndex + 1} / {allMedia.length}
+      {/* Image counter */}
+      <div className="absolute top-4 left-4 text-white text-sm bg-black bg-opacity-50 px-3 py-1 rounded">
+        {currentIndex + 1} of {allMedia.length}
       </div>
     </div>
   );

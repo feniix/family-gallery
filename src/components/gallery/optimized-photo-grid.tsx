@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { MediaMetadata } from '@/types/media';
-import { PhotoCardWrapper } from './photo-card-wrapper';
-import { SimpleLightboxWrapper } from './simple-lightbox-wrapper';
+import { PhotoCard } from './photo-card';
+import { SimpleLightbox } from './simple-lightbox';
 import { useNextPagePreloading } from '@/hooks/use-smart-preloading';
 import { r2Config } from '@/lib/config';
 
@@ -115,7 +115,7 @@ export function OptimizedPhotoGrid({
       {/* Photo Grid */}
       <div className={`grid ${gridCols} gap-2 md:gap-4`}>
         {media.map((mediaItem, index) => (
-          <PhotoCardWrapper
+                      <PhotoCard
             key={mediaItem.id}
             media={mediaItem}
             onClick={() => handleMediaClick(mediaItem)}
@@ -166,7 +166,7 @@ export function OptimizedPhotoGrid({
 
       {/* Lightbox */}
       {selectedMedia && (
-        <SimpleLightboxWrapper
+        <SimpleLightbox
           media={selectedMedia}
           allMedia={media}
           currentIndex={currentIndex}

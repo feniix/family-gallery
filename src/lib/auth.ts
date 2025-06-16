@@ -52,19 +52,7 @@ export function useIsAdmin() {
   }
 }
 
-/**
- * Legacy version of useIsAdmin that returns just the boolean
- * @deprecated Use useIsAdmin() and destructure { isAdmin } instead
- */
-export function useIsAdminLegacy() {
-  const { isAdmin, isLoading } = useIsAdmin()
-  
-  if (isLoading) {
-    return false
-  }
-  
-  return isAdmin
-}
+
 
 // Re-export from consolidated location
 export { isAdminEmail } 

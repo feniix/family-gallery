@@ -1,26 +1,50 @@
-'use client';
-
-import React from 'react';
-import Image from 'next/image';
-import { Badge } from '@/components/ui/badge';
-import { Calendar, Camera, MapPin, Play } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { MediaMetadata } from '@/types/media';
-import { format } from 'date-fns';
+import { useSignedUrl } from '@/hooks/use-signed-url';
+import { useIntersectionObserver } from '@/hooks/use-intersection-observer';
 
 interface PhotoCardProps {
   media: MediaMetadata;
   onClick: () => void;
   priority?: boolean;
-  aspectRatio?: 'square' | 'natural' | '4/3' | '3/2' | '16/9';
+  aspectRatio?: 'natural' | 'square' | '4/3' | '3/2' | '16/9';
 }
 
 export function PhotoCard({ media, onClick, priority = false, aspectRatio = 'natural' }: PhotoCardProps) {
-  // Use API endpoint for thumbnails to enable fallback to original image
-  const imageUrl = media.thumbnailPath 
-    ? `/api/media/download/${media.id}/thumbnail`
-    : `/api/media/download/${media.id}`;
+  const [imageError, setImageError] = useState(false);
+  
+  // Lazy loading with intersection observer
+  const { ref: intersectionRef, isIntersecting } = useIntersectionObserver({
+    threshold: 0.1,
+    rootMargin: '100px', // Start loading 100px before entering viewport
+    triggerOnce: true // Only load once when first visible
+  });
+  
+  // Get signed URL for thumbnail - only when visible or priority
+  const { url: thumbnailUrl, loading: thumbnailLoading, error: thumbnailError } = useSignedUrl({
+    mediaId: media.id,
+    isThumbnail: true,
+    expiresIn: 3600, // 1 hour
+    enabled: priority || isIntersecting // Load immediately if priority, otherwise when visible
+  });
+
+  // Debug logging
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📷 PhotoCard state:', {
+        mediaId: media.id,
+        filename: media.originalFilename,
+        thumbnailUrl: thumbnailUrl ? `URL received (${thumbnailUrl.substring(0, 50)}...)` : 'No URL',
+        thumbnailLoading,
+        thumbnailError: thumbnailError ? (typeof thumbnailError === 'string' ? thumbnailError : 'Unknown error') : null,
+        priority,
+        isIntersecting,
+        imageError
+      });
+    }
+  }, [media.id, media.originalFilename, thumbnailUrl, thumbnailLoading, thumbnailError, priority, isIntersecting, imageError]);
+
   const isVideo = media.type === 'video';
-  const hasVideoThumbnail = isVideo && media.thumbnailPath;
 
   // Calculate aspect ratio class or style
   const getAspectRatioConfig = () => {
@@ -66,122 +90,156 @@ export function PhotoCard({ media, onClick, priority = false, aspectRatio = 'nat
 
   const aspectConfig = getAspectRatioConfig();
 
+  // Show loading state while fetching signed URL
+  if (thumbnailLoading) {
+    return (
+      <div 
+        className={`relative overflow-hidden rounded-lg bg-gray-200 animate-pulse cursor-pointer ${
+          aspectConfig.useInlineStyle ? '' : aspectConfig.className
+        }`}
+        style={aspectConfig.useInlineStyle ? aspectConfig.style : undefined}
+        onClick={onClick}
+      >
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if signed URL failed to load
+  if (thumbnailError || !thumbnailUrl) {
+    const errorMessage = thumbnailError || 'No URL available';
+    const isAuthError = thumbnailError?.includes('401') || thumbnailError?.includes('403');
+    const isServerError = thumbnailError?.includes('500') || thumbnailError?.includes('502') || thumbnailError?.includes('503');
+    
+    return (
+      <div 
+        className={`relative overflow-hidden rounded-lg bg-gray-100 border-2 border-dashed border-gray-300 cursor-pointer ${
+          aspectConfig.useInlineStyle ? '' : aspectConfig.className
+        }`}
+        style={aspectConfig.useInlineStyle ? aspectConfig.style : undefined}
+        onClick={onClick}
+        title={`Error: ${errorMessage}`}
+      >
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
+          <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+          <span className="text-xs text-center px-2">
+            {isAuthError ? 'Access denied' : isServerError ? 'Server error' : 'Failed to load'}
+          </span>
+          {process.env.NODE_ENV === 'development' && (
+            <span className="text-xs text-center px-2 mt-1 text-red-500">
+              {errorMessage}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div 
-      className="group relative overflow-hidden rounded-lg bg-muted cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-lg"
+      ref={intersectionRef}
+      className={`relative overflow-hidden rounded-lg bg-gray-100 cursor-pointer group ${
+        aspectConfig.useInlineStyle ? '' : aspectConfig.className
+      }`}
+      style={aspectConfig.useInlineStyle ? aspectConfig.style : undefined}
       onClick={onClick}
     >
-      {/* Image/Video Container */}
-      <div 
-        className={`relative ${aspectConfig.useInlineStyle ? '' : aspectConfig.className}`}
-        style={aspectConfig.useInlineStyle ? aspectConfig.style : undefined}
-      >
-        {hasVideoThumbnail || !isVideo ? (
-          aspectConfig.className === '' ? (
-            // Natural aspect ratio without constraints
-            <Image
-              src={imageUrl}
-              alt={media.originalFilename}
-              width={media.metadata?.width || 800}
-              height={media.metadata?.height || 600}
-              className="w-full h-auto object-cover transition-transform duration-200 group-hover:scale-110"
-              priority={priority}
-              sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-            />
-          ) : (
-            // Constrained aspect ratio
-            <Image
-              src={imageUrl}
-              alt={media.originalFilename}
-              fill
-              className="object-cover transition-transform duration-200 group-hover:scale-110"
-              priority={priority}
-              sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-            />
-          )
-        ) : (
-          // Placeholder for videos without thumbnails
-          <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-            <div className="text-center text-gray-500">
-              <Play className="h-12 w-12 mx-auto mb-2" />
-              <p className="text-sm font-medium">Video</p>
-              <p className="text-xs">Thumbnail not available</p>
-            </div>
-          </div>
-        )}
-        
-        {/* Video Indicator */}
-        {isVideo && hasVideoThumbnail && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-            <div className="rounded-full bg-white/90 p-3 shadow-lg">
-              <Play className="h-6 w-6 text-black fill-black" />
-            </div>
-          </div>
-        )}
+      {/* Main Image - Use regular img tag for signed URLs to bypass Next.js image optimization */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={thumbnailUrl}
+        alt={media.originalFilename}
+        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+        loading={priority ? 'eager' : 'lazy'}
+        onError={(e) => {
+          // Prevent the default error logging that shows empty object
+          e.preventDefault();
+          
+          const target = e.target as HTMLImageElement;
+          const errorDetails = {
+            mediaId: media.id,
+            src: thumbnailUrl,
+            filename: media.originalFilename,
+            errorType: e.type || 'error',
+            tagName: target?.tagName || 'IMG',
+            currentSrc: target?.currentSrc || thumbnailUrl || 'unknown',
+            naturalWidth: target?.naturalWidth || 0,
+            naturalHeight: target?.naturalHeight || 0,
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent.substring(0, 100)
+          };
+          
+          // Use a more specific console method to avoid Next.js error interception
+          console.warn('🖼️ Image failed to load:', errorDetails);
+          
+          // Set error state to show fallback UI
+          setImageError(true);
+          
+          // In development, provide additional debugging info
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('🔍 Debug info: Signed URL may have expired, CORS issue, or network problem. Check R2 configuration and network tab.');
+            
+            // Try to provide more context about the error
+            if (thumbnailUrl?.includes('X-Amz-Expires')) {
+              console.warn('🕒 This appears to be a signed URL - check if it has expired');
+            }
+            if (!thumbnailUrl) {
+              console.warn('❌ No thumbnail URL available - check signed URL generation');
+            }
+          }
+        }}
+        crossOrigin="anonymous" // Important for CORS with signed URLs
+      />
 
-        {/* Overlay with Metadata */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
-            <div className="space-y-1">
-              {/* Date */}
-              <div className="flex items-center gap-1 text-xs">
-                <Calendar className="h-3 w-3" />
-                <span>{format(new Date(media.takenAt), 'MMM d, yyyy')}</span>
-              </div>
-              
-              {/* Camera */}
-              {media.metadata.camera && (
-                <div className="flex items-center gap-1 text-xs">
-                  <Camera className="h-3 w-3" />
-                  <span className="truncate">{media.metadata.camera}</span>
-                </div>
-              )}
-              
-              {/* Location */}
-              {media.metadata.location && (
-                <div className="flex items-center gap-1 text-xs">
-                  <MapPin className="h-3 w-3" />
-                  <span>Location available</span>
-                </div>
-              )}
-            </div>
+      {/* Video Play Overlay */}
+      {isVideo && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 group-hover:bg-opacity-30 transition-all duration-200">
+          <div className="bg-white bg-opacity-90 rounded-full p-3 group-hover:scale-110 transition-transform duration-200">
+            <svg 
+              className="w-6 h-6 text-gray-800" 
+              fill="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path d="M8 5v14l11-7z"/>
+            </svg>
           </div>
         </div>
+      )}
 
-        {/* Top-right badges */}
-        <div className="absolute top-2 right-2 flex flex-col gap-1">
-          {media.isScreenshot && (
-            <Badge variant="secondary" className="text-xs px-1 py-0">
-              Screenshot
-            </Badge>
-          )}
-          {media.isEdited && (
-            <Badge variant="outline" className="text-xs px-1 py-0 bg-white/90">
-              Edited
-            </Badge>
-          )}
+      {/* Duration Badge for Videos */}
+      {isVideo && media.metadata?.duration && (
+        <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+          {formatDuration(media.metadata.duration)}
         </div>
+      )}
 
-        {/* Tags (bottom-left) */}
-        {media.tags.length > 0 && (
-          <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <div className="flex items-center gap-1">
-              <div className="flex gap-1">
-                {media.tags.slice(0, 2).map((tag) => (
-                  <Badge key={tag} variant="secondary" className="text-xs px-1 py-0 bg-white/90 text-black">
-                    {tag}
-                  </Badge>
-                ))}
-                {media.tags.length > 2 && (
-                  <Badge variant="secondary" className="text-xs px-1 py-0 bg-white/90 text-black">
-                    +{media.tags.length - 2}
-                  </Badge>
-                )}
-              </div>
-            </div>
+      {/* Error Overlay */}
+      {imageError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
+          <div className="text-center text-gray-500">
+            <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span className="text-xs">Image unavailable</span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
+}
+
+// Helper function to format video duration
+function formatDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  
+  if (minutes > 0) {
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  } else {
+    return `0:${remainingSeconds.toString().padStart(2, '0')}`;
+  }
 } 

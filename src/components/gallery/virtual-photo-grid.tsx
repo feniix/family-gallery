@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useInView } from 'react-intersection-observer';
-import { PhotoCardWrapper } from './photo-card-wrapper';
+import { PhotoCard } from './photo-card';
 import { PhotoGridSkeleton } from '@/components/ui/image-skeleton';
 import { MediaMetadata } from '@/types/media';
 import { toast } from 'sonner';
@@ -333,7 +333,7 @@ export function VirtualPhotoGrid({
         >
           {itemsToRender.map((item, index) => (
             <div key={item.id} className="break-inside-avoid mb-4">
-              <PhotoCardWrapper
+                              <PhotoCard
                 media={item}
                 onClick={() => handlePhotoClick(item, index)}
                 priority={index < 8} // Prioritize first 8 images

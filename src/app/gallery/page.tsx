@@ -25,10 +25,10 @@ import { TimelineView } from '@/components/gallery/timeline-view';
 import { PhotoGrid } from '@/components/gallery/photo-grid';
 import { VirtualPhotoGrid } from '@/components/gallery/virtual-photo-grid';
 import { SearchBar } from '@/components/gallery/search-bar';
-import { SimpleLightboxWrapper } from '@/components/gallery/simple-lightbox-wrapper';
+import { SimpleLightbox } from '@/components/gallery/simple-lightbox';
 import { MediaMetadata } from '@/types/media';
 import { isLowPerformanceDevice } from '@/lib/performance';
-import { R2ConfigDebug } from '@/components/debug/r2-config-debug';
+
 
 export default function GalleryPage() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -243,7 +243,7 @@ export default function GalleryPage() {
 
       {/* Enhanced Lightbox */}
       {selectedMedia && (
-        <SimpleLightboxWrapper
+        <SimpleLightbox
           media={selectedMedia}
           allMedia={displayMedia}
           currentIndex={selectedIndex}
@@ -254,8 +254,7 @@ export default function GalleryPage() {
         />
       )}
 
-      {/* Debug Component - Remove in production */}
-      <R2ConfigDebug />
+
     </div>
   );
 } 

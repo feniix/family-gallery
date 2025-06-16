@@ -157,45 +157,16 @@ export class MediaMemoryManager {
 
   /**
    * Pre-load images for better performance
-   * Note: Disabled when using signed URLs as preloading should be handled by the signed URL components
+   * Note: Preloading is now handled by the signed URL components and hooks
    */
-  preloadImages(mediaItems: MediaMetadata[], priorityIndexes: number[] = []) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  preloadImages(_mediaItems: MediaMetadata[], _priorityIndexes: number[] = []) {
     const monitor = PerformanceMonitor.getInstance();
     const startTime = performance.now();
 
-    // Skip preloading when using signed URLs - let the components handle it
-    // Check if signed URLs are enabled (avoid circular import by checking env directly)
-    const useSignedUrls = (typeof window !== 'undefined' 
-      ? process.env.NEXT_PUBLIC_R2_USE_SIGNED_URLS === 'true'
-      : process.env.R2_USE_SIGNED_URLS === 'true');
+    // Preloading is now handled by the signed URL components and hooks
+    // This method is kept for backward compatibility but does nothing
     
-    if (useSignedUrls) {
-      monitor.logPerformance('preloadImages', startTime);
-      return;
-    }
-
-    // Prioritize specific indexes first
-    const priorityItems = priorityIndexes.map(index => mediaItems[index]).filter(Boolean);
-    const regularItems = mediaItems.filter((_, index) => !priorityIndexes.includes(index));
-    
-    const itemsToLoad = [...priorityItems, ...regularItems].slice(0, 20); // Limit to 20 items
-
-    itemsToLoad.forEach((media, index) => {
-      if (media.type === 'photo' && !this.imageCache.has(media.id)) {
-        const img = new Image();
-        img.loading = index < 8 ? 'eager' : 'lazy';
-        img.src = `/api/media/download/${media.id}/thumbnail`;
-        
-        img.onload = () => {
-          this.addToCache(media.id, img);
-        };
-        
-        img.onerror = () => {
-          dbLogger.warn('Failed to preload image', { mediaId: media.id });
-        };
-      }
-    });
-
     monitor.logPerformance('preloadImages', startTime);
   }
 

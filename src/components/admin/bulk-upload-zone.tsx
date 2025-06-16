@@ -402,35 +402,60 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
           // Upload thumbnail if generated
           if (uploadFile.imageThumbnail && fileNaming.thumbnailPath) {
             try {
-              uploadLogger.info('Generating thumbnail for file', { filename: uploadFile.file.name });
-              const thumbnailBlob = await generateImageThumbnail(uploadFile.file, {
-                width: 320,
-                height: 240,
-                quality: 0.8
-              });
-              uploadLogger.info('Thumbnail generated', {
+              uploadLogger.info('Uploading thumbnail for file', { 
                 filename: uploadFile.file.name,
-                thumbnailSize: thumbnailBlob?.size || 0,
-                originalSize: uploadFile.file.size,
-                type: uploadFile.file.type
+                thumbnailPath: fileNaming.thumbnailPath,
+                thumbnailSize: uploadFile.imageThumbnail.size
               });
-              setState(prev => ({
-                ...prev,
-                files: prev.files.map(f => 
-                  f.id === uploadFile.id ? { ...f, imageThumbnail: thumbnailBlob } : f
-                )
-              }));
+
+              // Get presigned URL for thumbnail upload
+              const thumbnailPresignedResponse = await authenticatedFetch('/api/upload/presigned', {
+                method: 'POST',
+                body: JSON.stringify({
+                  filename: `${fileNaming.filename.replace(/\.[^/.]+$/, '')}_thumb.jpg`,
+                  contentType: 'image/jpeg',
+                  fileSize: uploadFile.imageThumbnail.size,
+                  customPath: fileNaming.thumbnailPath
+                })
+              });
+
+              if (!thumbnailPresignedResponse.ok) {
+                const errorText = await thumbnailPresignedResponse.text();
+                throw new Error(`Failed to get thumbnail upload URL: ${thumbnailPresignedResponse.status} - ${errorText}`);
+              }
+
+              const { presignedUrl: thumbnailPresignedUrl } = await thumbnailPresignedResponse.json();
+
+              // Upload thumbnail to R2
+              const thumbnailUploadResponse = await fetch(thumbnailPresignedUrl, {
+                method: 'PUT',
+                body: uploadFile.imageThumbnail,
+                headers: { 'Content-Type': 'image/jpeg' }
+              });
+
+              if (!thumbnailUploadResponse.ok) {
+                const errorText = await thumbnailUploadResponse.text();
+                throw new Error(`Thumbnail upload to R2 failed: ${thumbnailUploadResponse.status} - ${errorText}`);
+              }
+
+              uploadLogger.info('Thumbnail uploaded successfully', {
+                filename: uploadFile.file.name,
+                thumbnailPath: fileNaming.thumbnailPath
+              });
+
             } catch (error) {
-              exifLogger.error('EXIF extraction or thumbnail generation failed', { 
+              uploadLogger.error('Thumbnail upload failed', { 
                 filename: uploadFile.file.name,
                 error: error instanceof Error ? error.message : String(error)
               });
-              // Continue without thumbnail
+              // Continue without thumbnail - don't fail the entire upload
+              uploadLogger.warn('Continuing upload without thumbnail', { filename: uploadFile.file.name });
             }
           } else {
             uploadLogger.info('No thumbnail to upload', {
               filename: uploadFile.file.name,
-              hasBlob: !!uploadFile.imageThumbnail
+              hasBlob: !!uploadFile.imageThumbnail,
+              hasThumbnailPath: !!fileNaming.thumbnailPath
             });
           }
 

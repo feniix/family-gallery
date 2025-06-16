@@ -72,31 +72,7 @@ function generateThumbnailPath(originalPath: string, extension: string): string 
   return undefined;
 }
 
-/**
- * Extract date from WhatsApp filename patterns (legacy function - use shared utility instead)
- * @deprecated Use extractDateFromFilename from utils/filename-patterns.ts instead
- */
-export function extractDateFromWhatsAppFilename(filename: string): Date | null {
-  // WhatsApp patterns: IMG-20240115-WA0001.jpg, VID-20240115-WA0001.mp4
-  const whatsappPattern = /(IMG|VID)-(\d{4})(\d{2})(\d{2})-WA\d{4}/;
-  const match = filename.match(whatsappPattern);
-  
-  if (match) {
-    const year = parseInt(match[2]);
-    const month = parseInt(match[3]) - 1; // JS months are 0-indexed
-    const day = parseInt(match[4]);
-    
-    const date = new Date(year, month, day);
-    
-    // Validate the extracted date
-    if (!isNaN(date.getTime()) && 
-        year >= 2000 && year <= new Date().getFullYear() + 1) {
-      return date;
-    }
-  }
-  
-  return null;
-}
+
 
 /**
  * Generate storage path structure for organizing files

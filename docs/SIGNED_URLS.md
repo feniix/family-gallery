@@ -2,22 +2,13 @@
 
 ## Overview
 
-By default, the Family Gallery serves images through Next.js API routes that proxy files from Cloudflare R2 to the client. While this works well, it has some limitations:
+The Family Gallery now always serves images directly from Cloudflare R2 using signed URLs, providing:
 
-- **Server Load**: Every image request goes through your Next.js server
-- **Bandwidth Costs**: Images are downloaded from R2 to your server, then uploaded to the client
-- **Performance**: Additional latency due to the proxy layer
-- **Scalability**: Server resources are consumed for every image request
-
-The signed URL feature allows images to be served directly from Cloudflare R2, bypassing your application server entirely.
-
-## Benefits of Signed URLs
-
-✅ **Better Performance**: Direct connection from client to R2  
-✅ **Reduced Server Load**: No proxy layer consuming server resources  
-✅ **Lower Bandwidth Costs**: Images served directly from R2  
-✅ **Better Scalability**: Server resources freed up for other tasks  
-✅ **Improved Caching**: Better CDN and browser caching behavior  
+- **Better Performance**: Direct connection from client to R2  
+- **Reduced Server Load**: No proxy layer consuming server resources  
+- **Lower Bandwidth Costs**: Images served directly from R2  
+- **Better Scalability**: Server resources freed up for other tasks  
+- **Improved Caching**: Better CDN and browser caching behavior  
 
 ## How It Works
 
@@ -28,24 +19,11 @@ The signed URL feature allows images to be served directly from Cloudflare R2, b
 5. **Cache and serve**: Signed URL is cached and used directly by the browser
 6. **Auto-refresh**: URLs are automatically refreshed before expiration
 
-## Enabling Signed URLs
+## Configuration
 
-### Step 1: Environment Configuration
+### CORS Configuration
 
-Add to your `.env.local` or production environment:
-
-```bash
-# Enable signed URLs (both variables needed - server and client side)
-R2_USE_SIGNED_URLS=true
-NEXT_PUBLIC_R2_USE_SIGNED_URLS=true
-
-# Optional: Custom expiration time (default: 1 hour for thumbnails, 2 hours for full images)
-R2_PRESIGNED_URL_EXPIRATION=3600
-```
-
-### Step 2: CORS Configuration
-
-Since images will be served directly from R2, you need to configure CORS on your R2 bucket.
+Since images are served directly from R2, you need to configure CORS on your R2 bucket.
 
 #### Option A: Using Cloudflare Dashboard
 
@@ -73,7 +51,7 @@ Since images will be served directly from R2, you need to configure CORS on your
 
 If you have a custom domain configured for your R2 bucket (e.g., `images.your-domain.com`), CORS configuration may not be needed as custom domains often bypass CORS restrictions.
 
-### Step 3: Next.js Image Configuration
+### Next.js Image Configuration
 
 Ensure your `next.config.ts` includes your R2 domain:
 
@@ -99,170 +77,70 @@ const nextConfig: NextConfig = {
 };
 ```
 
-### Step 4: Deploy and Test
-
-1. Deploy your application with the new environment variable
-2. Test image loading in your gallery
-3. Check browser network tab to verify images are loading directly from R2
-
 ## Configuration Options
 
 ### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `R2_USE_SIGNED_URLS` | `false` | Enable/disable signed URL serving (server-side) |
-| `NEXT_PUBLIC_R2_USE_SIGNED_URLS` | `false` | Enable/disable signed URL serving (client-side) |
 | `R2_PRESIGNED_URL_EXPIRATION` | `900` | Default expiration time in seconds |
 
 ### Automatic Expiration Management
 
 The system automatically manages URL expiration:
 
-- **Thumbnails**: 1 hour expiration (frequently accessed)
-- **Full Images**: 2 hours expiration (less frequently accessed)
-- **Auto-refresh**: URLs refreshed 5 minutes before expiration
-- **Caching**: Signed URLs cached in memory to reduce API calls
+- **Thumbnails**: 1 hour expiration (3600 seconds)
+- **Full Images**: 2 hours expiration (7200 seconds) 
+- **Lightbox Images**: 24 hours expiration (86400 seconds)
+- **Auto-refresh**: URLs are refreshed 5 minutes before expiration
+- **Caching**: Signed URLs are cached in memory to reduce API calls
+- **Batch Loading**: Multiple URLs can be requested simultaneously for better performance
 
-### Performance Optimizations
+## Performance Features
 
-The implementation includes several advanced optimizations:
+### Smart Preloading
 
-#### **Lazy Loading**
-- Images only load signed URLs when entering the viewport
-- Uses Intersection Observer API for efficient viewport detection
-- Reduces unnecessary API calls by 60-80%
+The signed URL system includes intelligent preloading:
 
-#### **Batch Operations**
-- Multiple signed URLs generated in single API call
-- Reduces API latency and improves performance
-- Automatic fallback to individual requests if batch fails
+- **Intersection Observer**: Images load only when entering viewport
+- **Priority Loading**: Above-the-fold images load immediately
+- **Batch Requests**: Multiple signed URLs requested together
+- **Cache Management**: Automatic cleanup of expired URLs
 
-#### **Smart Preloading**
-- **Gallery View**: Preloads thumbnails for images around current viewport
-- **Lightbox**: Preloads full images for previous/next navigation
-- **Infinite Scroll**: Preloads next page when approaching end
-- **Debounced**: Prevents excessive API calls during rapid scrolling
+### Error Handling
 
-## Security Considerations
+Robust error handling ensures reliability:
 
-### Access Control
+- **Fallback URLs**: Automatic retry with different parameters
+- **Graceful Degradation**: Error states with retry options
+- **Logging**: Comprehensive error tracking and debugging
 
-- ✅ **Authentication Required**: Users must be authenticated to get signed URLs
-- ✅ **Permission Checks**: Server verifies user has access to specific media
-- ✅ **Time-Limited**: URLs expire automatically (max 24 hours)
-- ✅ **Non-Guessable**: URLs contain cryptographic signatures
+## Migration Notes
 
-### Best Practices
+### Changes Made
 
-1. **Keep Expiration Times Reasonable**: Don't set extremely long expiration times
-2. **Monitor Access Logs**: Check R2 access logs for unusual patterns
-3. **Use HTTPS Only**: Ensure all domains use HTTPS
-4. **Regular Security Reviews**: Periodically review access patterns
+The codebase has been simplified to always use signed URLs:
 
-## Troubleshooting
+1. **Removed proxy routes**: `/api/media/download/*` endpoints deleted
+2. **Simplified components**: Removed conditional logic between proxy and signed URL modes
+3. **Consolidated code**: Single set of components instead of separate proxy/signed versions
+4. **Environment variables**: No longer need `NEXT_PUBLIC_R2_USE_SIGNED_URLS` or `R2_USE_SIGNED_URLS`
 
-### Images Not Loading
+### Backward Compatibility
 
-**Symptom**: Images show loading spinner or error state
-
-**Solutions**:
-1. Check browser console for CORS errors
-2. Verify R2 CORS configuration
-3. Ensure Next.js image domains are configured
-4. Check network tab for failed requests
-
-### Slow Initial Load
-
-**Symptom**: First image load is slow, subsequent loads are fast
-
-**Explanation**: This is expected behavior. The first load requires:
-1. API call to get signed URL
-2. Image download from R2
-
-Subsequent loads use cached signed URLs.
-
-### CORS Errors
-
-**Symptom**: Browser console shows CORS policy errors
-
-**Solutions**:
-1. Configure CORS on R2 bucket (see Step 2 above)
-2. Consider using a custom domain for R2
-3. Verify allowed origins match your domain exactly
-
-### Signed URL Expired
-
-**Symptom**: Images stop loading after some time
-
-**Explanation**: Signed URLs have expired. The system should auto-refresh, but if it doesn't:
-
-1. Check browser console for refresh errors
-2. Verify server can generate new signed URLs
-3. Clear browser cache and reload
-
-## Performance Monitoring
-
-### Metrics to Track
-
-1. **Image Load Times**: Compare before/after enabling signed URLs
-2. **Server CPU/Memory**: Should decrease with signed URLs enabled
-3. **Bandwidth Usage**: Server bandwidth should decrease
-4. **Error Rates**: Monitor for increased 4xx/5xx errors
-
-### Expected Improvements
-
-- **50-80% reduction** in server bandwidth usage
-- **30-50% faster** image load times
-- **Reduced server CPU/memory** usage
-- **Better user experience** with faster gallery browsing
-
-### API Efficiency Improvements
-
-With the optimizations enabled:
-
-- **60-80% fewer API calls** due to lazy loading
-- **50-70% reduced latency** with batch operations
-- **Smoother scrolling** with smart preloading
-- **Better cache utilization** with intelligent prefetching
-
-## Fallback Behavior
-
-If signed URL generation fails, the system gracefully falls back to:
-
-1. **Error Display**: Shows user-friendly error message
-2. **Retry Mechanism**: Automatic retry for transient failures
-3. **Logging**: Detailed error logging for debugging
-
-## Migration Guide
-
-### From Proxy to Signed URLs
-
-1. **Test in Development**: Enable `R2_USE_SIGNED_URLS=true` locally
-2. **Configure CORS**: Set up R2 CORS policy
-3. **Deploy to Staging**: Test with production-like data
-4. **Monitor Performance**: Check metrics and error rates
-5. **Deploy to Production**: Enable in production environment
-
-### Rollback Plan
-
-To disable signed URLs and return to proxy serving:
-
-1. Set `R2_USE_SIGNED_URLS=false`
-2. Deploy the change
-3. No other configuration changes needed
-
-The system will automatically switch back to proxy serving.
+- **API endpoints**: Signed URL endpoints remain unchanged
+- **Component interfaces**: Same props and behavior
+- **Database**: No changes to media metadata structure
 
 ## FAQ
 
 ### Q: Do I need to change my existing code?
 
-**A**: No. The wrapper components automatically switch between proxy and signed URL modes based on the environment variable.
+**A**: No. The component interfaces remain the same, only the internal implementation changed.
 
 ### Q: What happens to existing cached images?
 
-**A**: Browser-cached images continue to work. New requests will use the configured method.
+**A**: Browser-cached images continue to work. New requests will use signed URLs.
 
 ### Q: Can I use signed URLs with a CDN?
 
