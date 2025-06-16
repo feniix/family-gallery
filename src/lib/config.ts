@@ -18,9 +18,8 @@ export const uploadConfig = {
   maxPhotoSizeMB: parseInt(process.env.UPLOAD_MAX_PHOTO_SIZE_MB || '50'), // Default: 50MB for photos
   maxVideoSizeMB: parseInt(process.env.UPLOAD_MAX_VIDEO_SIZE_MB || '200'), // Default: 200MB for videos
   
-  // Getters for backward compatibility and internal use
+  // Getters for internal use
   get maxFileSize() {
-    // Return the larger of the two for general use
     return Math.max(this.maxPhotoSizeMB, this.maxVideoSizeMB) * 1024 * 1024;
   },
   get maxPhotoSize() {
@@ -76,32 +75,10 @@ export const loggingConfig = {
  */
 
 /**
- * Get maximum file size display for photos
- */
-export function getMaxPhotoSizeDisplay(): string {
-  return `${uploadConfig.maxPhotoSizeMB}MB`;
-}
-
-/**
- * Get maximum file size display for videos
- */
-export function getMaxVideoSizeDisplay(): string {
-  return `${uploadConfig.maxVideoSizeMB}MB`;
-}
-
-/**
- * Get maximum file size in a human readable format (backward compatibility)
- */
-export function getMaxFileSizeDisplay(): string {
-  return `${getMaxPhotoSizeDisplay()} (photos), ${getMaxVideoSizeDisplay()} (videos)`;
-}
-
-/**
  * Check if a file size is within the allowed limit based on file type
  */
 export function isFileSizeValid(fileSize: number, fileType?: string): boolean {
   if (!fileType) {
-    // If no type specified, use the general limit (backward compatibility)
     return fileSize <= uploadConfig.maxFileSize;
   }
   
@@ -111,7 +88,6 @@ export function isFileSizeValid(fileSize: number, fileType?: string): boolean {
     return fileSize <= uploadConfig.maxVideoSize;
   }
   
-  // Default to photo size for unknown types
   return fileSize <= uploadConfig.maxPhotoSize;
 }
 
@@ -125,7 +101,6 @@ export function getFileSizeLimit(fileType: string): number {
     return uploadConfig.maxVideoSize;
   }
   
-  // Default to photo size for unknown types
   return uploadConfig.maxPhotoSize;
 }
 
@@ -134,13 +109,12 @@ export function getFileSizeLimit(fileType: string): number {
  */
 export function getFileSizeLimitDisplay(fileType: string): string {
   if (fileType.startsWith('image/')) {
-    return getMaxPhotoSizeDisplay();
+    return `${uploadConfig.maxPhotoSizeMB}MB`;
   } else if (fileType.startsWith('video/')) {
-    return getMaxVideoSizeDisplay();
+    return `${uploadConfig.maxVideoSizeMB}MB`;
   }
   
-  // Default to photo size for unknown types
-  return getMaxPhotoSizeDisplay();
+  return `${uploadConfig.maxPhotoSizeMB}MB`;
 }
 
 /**
@@ -191,9 +165,9 @@ export const clientConfig = {
     isProduction: process.env.NODE_ENV === 'production',
     isDevelopment: process.env.NODE_ENV === 'development',
   },
-  }
-  
-  // Validate required environment variables (server-side only)
+}
+
+// Validate required environment variables (server-side only)
 const requiredEnvVars = [
   'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
   'CLERK_SECRET_KEY',

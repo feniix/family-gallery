@@ -81,16 +81,6 @@ export class DatabaseError extends AppError {
 }
 
 /**
- * Configuration errors
- */
-export class ConfigurationError extends AppError {
-  constructor(message: string, context?: Record<string, unknown>) {
-    super(message, 'CONFIGURATION_ERROR', 500, context);
-    this.name = 'ConfigurationError';
-  }
-}
-
-/**
  * External service errors (R2, Clerk, etc.)
  */
 export class ExternalServiceError extends AppError {
@@ -214,6 +204,16 @@ export function handleApiError(error: unknown): { error: string; statusCode: num
 }
 
 /**
+ * Configuration errors
+ */
+class ConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConfigurationError';
+  }
+}
+
+/**
  * Validate required environment variables
  */
 export function validateRequiredEnvVars(vars: string[]): void {
@@ -221,8 +221,7 @@ export function validateRequiredEnvVars(vars: string[]): void {
   
   if (missing.length > 0) {
     throw new ConfigurationError(
-      `Missing required environment variables: ${missing.join(', ')}`,
-      { missingVars: missing }
+      `Missing required environment variables: ${missing.join(', ')}`
     );
   }
 }

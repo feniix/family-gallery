@@ -4,25 +4,45 @@ import { auth } from '@clerk/nextjs/server';
 import { uploadLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
+  let formData: FormData | null = null;
   try {
+    uploadLogger.info('Video upload request started');
+    
     const { userId } = await auth();
     
     if (!userId) {
+      uploadLogger.warn('Video upload unauthorized - no userId');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const formData = await request.formData();
+    uploadLogger.info('Video upload authorized', { userId });
+    formData = await request.formData();
+    uploadLogger.info('FormData parsed successfully');
     const file = formData.get('file') as File;
     const userIdFromForm = formData.get('userId') as string;
     const tagsJson = formData.get('tags') as string;
     const videoMetadataJson = formData.get('videoMetadata') as string;
     const thumbnailFile = formData.get('thumbnail') as File;
     
+    uploadLogger.info('FormData contents extracted', {
+      hasFile: !!file,
+      fileName: file?.name,
+      fileSize: file?.size,
+      fileType: file?.type,
+      userIdFromForm,
+      hasTags: !!tagsJson,
+      hasVideoMetadata: !!videoMetadataJson,
+      hasThumbnail: !!thumbnailFile,
+      thumbnailSize: thumbnailFile?.size
+    });
+    
     if (!file) {
+      uploadLogger.error('No file provided in upload request');
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
     if (!file.type.startsWith('video/')) {
+      uploadLogger.error('Invalid file type', { fileType: file.type, fileName: file.name });
       return NextResponse.json({ error: 'File must be a video' }, { status: 400 });
     }
 
@@ -57,10 +77,13 @@ export async function POST(request: NextRequest) {
     const filePath = `originals/${year}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${timestamp}_${filename}`;
     
     // Get presigned URL for video upload
+    uploadLogger.info('Generating presigned URL', { filePath, fileType: file.type });
     const { generatePresignedUploadUrl } = await import('@/lib/r2');
     const presignedUrl = await generatePresignedUploadUrl(filePath, file.type);
+    uploadLogger.info('Presigned URL generated successfully');
     
     // Upload to R2
+    uploadLogger.info('Starting R2 upload', { fileSize: file.size });
     const uploadResponse = await fetch(presignedUrl, {
       method: 'PUT',
       body: file,
@@ -68,8 +91,13 @@ export async function POST(request: NextRequest) {
     });
     
     if (!uploadResponse.ok) {
+      uploadLogger.error('R2 upload failed', { 
+        status: uploadResponse.status, 
+        statusText: uploadResponse.statusText 
+      });
       throw new Error(`R2 upload failed: ${uploadResponse.status}`);
     }
+    uploadLogger.info('R2 upload completed successfully');
     
     // Upload thumbnail if provided
     let thumbnailPath = '';
@@ -120,6 +148,7 @@ export async function POST(request: NextRequest) {
     };
     
     // Save to database
+    uploadLogger.info('Saving to database', { mediaId: result.id, year });
     const { getMediaDb, addYearToIndex } = await import('@/lib/json-db');
     const mediaDb = getMediaDb(year);
     await mediaDb.update((current) => {
@@ -128,9 +157,12 @@ export async function POST(request: NextRequest) {
       current.media.sort((a, b) => new Date(b.takenAt).getTime() - new Date(a.takenAt).getTime());
       return current;
     });
+    uploadLogger.info('Media saved to database successfully');
 
     // Update the media index to include this year
+    uploadLogger.info('Updating media index');
     await addYearToIndex(year);
+    uploadLogger.info('Media index updated successfully');
 
     // Add tags if provided
     if (tags.length > 0 && result.id) {
@@ -162,10 +194,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    uploadLogger.info('Video upload completed successfully', { 
+      mediaId: result.id, 
+      filename: result.originalFilename,
+      hasThumbnail: !!result.thumbnailPath 
+    });
     return NextResponse.json(result);
 
   } catch (error) {
-    uploadLogger.error('Video upload failed', { error });
+    uploadLogger.error('Video upload failed', { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      filename: formData?.get('file') ? (formData.get('file') as File).name : 'unknown'
+    });
     return NextResponse.json(
       { error: 'Upload failed', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

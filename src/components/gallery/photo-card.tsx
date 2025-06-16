@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { MediaMetadata } from '@/types/media';
 import { useSignedUrl } from '@/hooks/use-signed-url';
 import { useIntersectionObserver } from '@/hooks/use-intersection-observer';
@@ -28,23 +28,7 @@ export function PhotoCard({ media, onClick, priority = false, aspectRatio = 'nat
     enabled: priority || isIntersecting // Load immediately if priority, otherwise when visible
   });
 
-  // Debug logging
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('📷 PhotoCard state:', {
-        mediaId: media.id,
-        filename: media.originalFilename,
-        thumbnailPath: media.thumbnailPath,
-        thumbnailUrl: thumbnailUrl ? `URL received (${thumbnailUrl.substring(0, 50)}...)` : 'No URL',
-        thumbnailLoading,
-        thumbnailError: thumbnailError ? (typeof thumbnailError === 'string' ? thumbnailError : 'Unknown error') : null,
-        priority,
-        isIntersecting,
-        imageError,
-        hookEnabled: priority || isIntersecting
-      });
-    }
-  }, [media.id, media.originalFilename, media.thumbnailPath, thumbnailUrl, thumbnailLoading, thumbnailError, priority, isIntersecting, imageError]);
+
 
   const isVideo = media.type === 'video';
 

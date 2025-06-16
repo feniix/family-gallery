@@ -15,6 +15,7 @@ export interface ApiResponse<T = unknown> {
 
 /**
  * Authenticated fetch wrapper that automatically includes credentials
+ * Essential for Clerk cookie-based authentication
  */
 export async function authenticatedFetch(
   url: string, 
@@ -22,17 +23,15 @@ export async function authenticatedFetch(
 ): Promise<Response> {
   apiLogger.debug('Authenticated fetch called', { 
     url, 
-    method: options.method || 'GET',
-    hasCredentials: true,
-    hasHeaders: !!options.headers,
-    hasCookies: typeof document !== 'undefined' ? !!document.cookie : false
+    method: options.method || 'GET'
   });
   
   const response = await fetch(url, {
     ...options,
-    credentials: 'include',
+    credentials: 'include', // Critical for Clerk auth
     headers: {
-      'Content-Type': 'application/json',
+      // Only set Content-Type if not FormData (FormData needs browser to set boundary)
+      ...(!(options.body instanceof FormData) && { 'Content-Type': 'application/json' }),
       ...options.headers,
     },
   });
@@ -40,11 +39,10 @@ export async function authenticatedFetch(
   apiLogger.debug('Authenticated fetch response', { 
     url,
     status: response.status, 
-    statusText: response.statusText,
-    headers: Object.fromEntries(response.headers.entries())
+    statusText: response.statusText
   });
   
-  // If we get a redirect, log more details
+  // Log auth issues for debugging
   if (response.status === 307 || response.status === 302) {
     apiLogger.warn('Authentication redirect detected', {
       url,

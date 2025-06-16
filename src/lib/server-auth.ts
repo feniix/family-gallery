@@ -1,5 +1,4 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
-import { redirect } from 'next/navigation'
+import { currentUser } from '@clerk/nextjs/server'
 import { usersDb, withRetry } from '@/lib/json-db'
 import type { UsersData } from '@/types/media'
 import { authLogger } from './logger'
@@ -56,119 +55,9 @@ export async function getCurrentUserRole(): Promise<'admin' | 'family' | 'extend
   }
 }
 
-/**
- * Server-side function to get current user data from database
- */
-export async function getCurrentUserData() {
-  const user = await currentUser()
-  
-  if (!user?.id) {
-    return null
-  }
-
-  try {
-    const usersData: UsersData = await withRetry(() => usersDb.read())
-    return usersData.users[user.id] || null
-  } catch (error) {
-    authLogger.error('Error fetching user data from database', { error })
-    return null
-  }
-}
-
-/**
- * Server-side function to check if current user has access to content
- */
-export async function getCurrentUserHasAccess(): Promise<boolean> {
-  const userData = await getCurrentUserData()
-  
-  if (!userData) {
-    return false
-  }
-
-  // Admins always have access
-  if (userData.role === 'admin') {
-    return true
-  }
-
-  // Users must be approved and not be guests
-  return userData.status === 'approved' && userData.role !== 'guest'
-}
-
-/**
- * Server-side function to require admin access (redirects if not admin)
- */
-export async function requireAdmin() {
-  const { userId } = await auth()
-  
-  if (!userId) {
-    redirect('/sign-in')
-  }
-
-  const isAdmin = await getIsAdmin()
-  if (!isAdmin) {
-    redirect('/gallery') // Redirect non-admins to gallery
-  }
-}
-
-/**
- * Server-side function to require authentication (redirects if not authenticated)
- */
-export async function requireAuth() {
-  const { userId } = await auth()
-  
-  if (!userId) {
-    redirect('/sign-in')
-  }
-
-  return userId
-}
-
 // Re-export from consolidated location
 import { isAdminEmail } from '@/lib/utils'
 export { isAdminEmail }
-
-/**
- * Get user role based on email
- */
-export function getUserRole(userEmail: string): 'admin' | 'guest' {
-  return isAdminEmail(userEmail) ? 'admin' : 'guest'
-}
-
-/**
- * Check if user has access to content using auth result from middleware
- */
-export async function checkUserHasAccessFromAuth(authResult: { userId: string | null }): Promise<boolean> {
-  if (!authResult?.userId) {
-    return false
-  }
-
-  try {
-    const usersData: UsersData = await withRetry(() => usersDb.read())
-    const userData = usersData.users[authResult.userId]
-    
-    if (!userData) {
-      return false
-    }
-
-    // Admins always have access
-    if (userData.role === 'admin') {
-      return true
-    }
-
-    // Users must be approved and not be guests
-    return userData.status === 'approved' && userData.role !== 'guest'
-  } catch (error) {
-    authLogger.error('Error checking user access from auth', { error })
-    return false
-  }
-}
-
-/**
- * Check if user is admin by email from Clerk user object
- */
-export function checkIsAdminFromEmail(email: string): boolean {
-  return isAdminEmail(email)
-}
 
 /**
  * Smart access check: Check admin email first, then database

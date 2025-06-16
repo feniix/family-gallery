@@ -1,35 +1,24 @@
 /**
- * Video processing utilities for client-side thumbnail generation and metadata extraction
+ * Video processing utilities for client-side thumbnail generation
  */
 
 import { videoLogger } from './logger';
 
-export interface BrowserCompatibility {
-  supportsVideoProcessing: boolean;
-  supportsCanvas: boolean;
-  supportsWebCodecs: boolean;
-  supportsOffscreenCanvas: boolean;
-}
-
-export interface VideoMetadata {
+interface VideoMetadata {
   duration: number;
   width: number;
   height: number;
-  videoCodec?: string;
-  audioCodec?: string;
-  bitrate?: number;
-  framerate?: number;
   size: number;
 }
 
-export interface ThumbnailGenerationResult {
+interface ThumbnailGenerationResult {
   thumbnail: Blob | null;
   metadata: VideoMetadata;
   error?: string;
   fallbackUsed: boolean;
 }
 
-export interface VideoProcessingOptions {
+interface VideoProcessingOptions {
   thumbnailTime?: number; // Time in seconds to capture thumbnail (default: 2s or 10% of duration)
   thumbnailWidth?: number; // Max width for thumbnail (default: 320)
   thumbnailHeight?: number; // Max height for thumbnail (default: 240)
@@ -40,60 +29,35 @@ export interface VideoProcessingOptions {
 /**
  * Check if browser supports video processing
  */
-export async function checkBrowserCompatibility(): Promise<BrowserCompatibility> {
+async function checkBrowserCompatibility(): Promise<boolean> {
   try {
     // Check for required APIs
     if (!HTMLVideoElement || !HTMLCanvasElement || !CanvasRenderingContext2D) {
-      return {
-        supportsVideoProcessing: false,
-        supportsCanvas: false,
-        supportsWebCodecs: false,
-        supportsOffscreenCanvas: false
-      };
+      return false;
     }
 
     // Check for createObjectURL support
     if (!URL || !URL.createObjectURL) {
-      return {
-        supportsVideoProcessing: false,
-        supportsCanvas: false,
-        supportsWebCodecs: false,
-        supportsOffscreenCanvas: false
-      };
+      return false;
     }
 
     // Test canvas toBlob support
     const canvas = document.createElement('canvas');
     if (!canvas.getContext || !canvas.toBlob) {
-      return {
-        supportsVideoProcessing: false,
-        supportsCanvas: false,
-        supportsWebCodecs: false,
-        supportsOffscreenCanvas: false
-      };
+      return false;
     }
 
-    return {
-      supportsVideoProcessing: true,
-      supportsCanvas: true,
-      supportsWebCodecs: true,
-      supportsOffscreenCanvas: true
-    };
+    return true;
   } catch (error) {
     videoLogger.warn('Browser compatibility check failed', { error: error instanceof Error ? error.message : 'Unknown error' });
-    return {
-      supportsVideoProcessing: false,
-      supportsCanvas: false,
-      supportsWebCodecs: false,
-      supportsOffscreenCanvas: false
-    };
+    return false;
   }
 }
 
 /**
  * Extract video metadata from file
  */
-export async function extractVideoMetadata(
+async function extractVideoMetadata(
   videoFile: File,
   options: VideoProcessingOptions = {}
 ): Promise<VideoMetadata> {
@@ -121,16 +85,6 @@ export async function extractVideoMetadata(
           height: video.videoHeight,
           size: videoFile.size,
         };
-
-        // Try to extract additional codec information if available
-        try {
-          // This might not be available in all browsers
-          if ('webkitAudioDecodedByteCount' in video) {
-            // Additional metadata available in some browsers
-          }
-        } catch {
-          // Ignore codec detection errors
-        }
 
         cleanup();
         resolve(metadata);
@@ -174,8 +128,8 @@ export async function generateVideoThumbnail(
   } = options;
 
   // Check browser compatibility first
-  const browserCompatibility = await checkBrowserCompatibility();
-  if (!browserCompatibility.supportsVideoProcessing) {
+  const browserCompatible = await checkBrowserCompatibility();
+  if (!browserCompatible) {
     const metadata = await extractVideoMetadata(videoFile, options);
     return {
       thumbnail: null,
@@ -209,19 +163,19 @@ export async function generateVideoThumbnail(
           error: errorMessage,
           fallbackUsed: true,
         });
-              } catch (metadataError) {
-          resolve({
-            thumbnail: null,
-            metadata: {
-              duration: 0,
-              width: 0,
-              height: 0,
-              size: videoFile.size,
-            },
-            error: `${errorMessage}; Metadata extraction also failed: ${metadataError instanceof Error ? metadataError.message : String(metadataError)}`,
-            fallbackUsed: true,
-          });
-        }
+      } catch (metadataError) {
+        resolve({
+          thumbnail: null,
+          metadata: {
+            duration: 0,
+            width: 0,
+            height: 0,
+            size: videoFile.size,
+          },
+          error: `${errorMessage}; Metadata extraction also failed: ${metadataError instanceof Error ? metadataError.message : String(metadataError)}`,
+          fallbackUsed: true,
+        });
+      }
     };
 
     const handleLoadedMetadata = async () => {

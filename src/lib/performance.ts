@@ -1,20 +1,10 @@
 /**
  * Performance optimization utilities for the gallery
- * Includes memory management, virtual scrolling, and performance monitoring
+ * Includes memory management and performance monitoring
  */
 
 import { MediaMetadata } from '@/types/media';
 import { dbLogger } from './logger'
-
-/**
- * Virtual scrolling configuration
- */
-export interface VirtualScrollConfig {
-  containerHeight: number;
-  itemHeight: number;
-  overscan: number; // Number of items to render outside visible area
-  bufferSize: number; // Maximum items to keep in memory
-}
 
 /**
  * Performance monitoring utilities
@@ -99,9 +89,19 @@ export class PerformanceMonitor {
  * Virtual scrolling calculator
  */
 export class VirtualScrollCalculator {
-  private config: VirtualScrollConfig;
+  private config: {
+    containerHeight: number;
+    itemHeight: number;
+    overscan: number;
+    bufferSize: number;
+  };
 
-  constructor(config: VirtualScrollConfig) {
+  constructor(config: {
+    containerHeight: number;
+    itemHeight: number;
+    overscan: number;
+    bufferSize: number;
+  }) {
     this.config = config;
   }
 
@@ -133,7 +133,12 @@ export class VirtualScrollCalculator {
   /**
    * Update configuration
    */
-  updateConfig(config: Partial<VirtualScrollConfig>) {
+  updateConfig(config: Partial<{
+    containerHeight: number;
+    itemHeight: number;
+    overscan: number;
+    bufferSize: number;
+  }>) {
     this.config = { ...this.config, ...config };
   }
 }
@@ -247,27 +252,6 @@ export function createOptimizedScrollHandler(
       }, throttleMs - timeSinceLastCall);
     }
   };
-}
-
-/**
- * Intersection Observer optimization
- */
-export function createOptimizedIntersectionObserver(
-  callback: IntersectionObserverCallback,
-  options: IntersectionObserverInit = {}
-): IntersectionObserver {
-  const defaultOptions: IntersectionObserverInit = {
-    rootMargin: '100px',
-    threshold: [0, 0.25, 0.5, 0.75, 1],
-    ...options
-  };
-
-  return new IntersectionObserver((entries, observer) => {
-    // Batch process entries for better performance
-    requestAnimationFrame(() => {
-      callback(entries, observer);
-    });
-  }, defaultOptions);
 }
 
 /**

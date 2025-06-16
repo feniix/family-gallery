@@ -62,14 +62,7 @@ export function useSignedUrl({
 
   const fetchSignedUrl = useCallback(async () => {
     if (!enabled || !mediaId) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔗 useSignedUrl: Skipping fetch', { enabled, mediaId, isThumbnail });
-      }
       return;
-    }
-
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔗 useSignedUrl: Starting fetch', { mediaId, isThumbnail, enabled });
     }
 
     try {
@@ -99,36 +92,14 @@ export function useSignedUrl({
 
       const url = `/api/media/signed-url/${mediaId}?${params.toString()}`;
       
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔗 useSignedUrl: Making API call', { url, mediaId, isThumbnail });
-      }
-
       const response = await authenticatedFetch(url);
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
-        if (process.env.NODE_ENV === 'development') {
-          console.error('🔗 useSignedUrl: API call failed', { 
-            status: response.status, 
-            statusText: response.statusText,
-            errorText,
-            url 
-          });
-        }
         throw new Error(`Failed to get signed URL (${response.status}): ${errorText}`);
       }
 
       const data: SignedUrlResponse = await response.json();
-      
-      // Debug logging
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Signed URL generated:', {
-          mediaId,
-          isThumbnail,
-          signedUrl: data.signedUrl,
-          expiresAt: data.expiresAt
-        });
-      }
       
       // Cache the result
       const expiresAt = new Date(data.expiresAt);
@@ -285,7 +256,4 @@ async function preloadSignedUrlsIndividually(
   await Promise.allSettled(promises);
 }
 
-// Utility function to clear cache (useful for logout or manual cache clearing)
-export function clearSignedUrlCache(): void {
-  signedUrlCache.clear();
-} 
+ 

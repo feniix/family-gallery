@@ -41,7 +41,7 @@ export function generateUniqueId(): string {
 }
 
 /**
- * Check if an email address should be an admin (consolidated from multiple locations)
+ * Check if an email address should be an admin
  */
 export function isAdminEmail(email: string): boolean {
   // Check both server-side and client-side environment variables
@@ -55,7 +55,7 @@ export function isAdminEmail(email: string): boolean {
 }
 
 /**
- * Validate file types (consolidated from multiple locations)
+ * Validate file types
  */
 export function isValidFileType(filename: string, type: 'image' | 'video' | 'any' = 'any'): boolean {
   const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.dng']
