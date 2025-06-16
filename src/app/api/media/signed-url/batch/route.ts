@@ -89,40 +89,35 @@ export async function POST(request: NextRequest) {
       const { mediaIndexDb } = await import('@/lib/json-db');
       const index = await withRetry(() => mediaIndexDb.read());
       
-      // Load all media from relevant years
+      // Search through all years that have data
       for (const year of index.years) {
         try {
           const mediaDb = getMediaDb(year);
           const mediaData = await withRetry(() => mediaDb.read());
           
-          if (mediaData.media) {
-            for (const media of mediaData.media) {
-              mediaMap.set(media.id, media);
-            }
+          // Add all media items to the lookup map
+          for (const item of mediaData.media || []) {
+            mediaMap.set(item.id, {
+              id: item.id,
+              originalFilename: item.originalFilename,
+              path: item.path,
+              thumbnailPath: item.thumbnailPath,
+              type: item.type
+            });
           }
         } catch {
           // Continue with other years if one fails
           continue;
         }
       }
-    } catch {
-      // Fallback: search recent years if index is not available
-      const currentYear = new Date().getFullYear();
-      for (let year = currentYear; year >= currentYear - 5; year--) {
-        try {
-          const mediaDb = getMediaDb(year);
-          const mediaData = await withRetry(() => mediaDb.read());
-          
-          if (mediaData.media) {
-            for (const media of mediaData.media) {
-              mediaMap.set(media.id, media);
-            }
-          }
-        } catch {
-          // Continue with other years
-          continue;
-        }
-      }
+    } catch (error) {
+      apiLogger.error('Error building media lookup map', {
+        error: error instanceof Error ? error.message : error
+      });
+      return NextResponse.json(
+        { error: 'Failed to load media database' },
+        { status: 500 }
+      );
     }
 
     // Process each request
@@ -152,7 +147,7 @@ export async function POST(request: NextRequest) {
 
         // Determine the file path
         const filePath = isThumbnail 
-          ? mediaItem.thumbnailPath || mediaItem.path 
+          ? mediaItem.thumbnailPath || mediaItem.path
           : mediaItem.path;
 
         if (!filePath) {

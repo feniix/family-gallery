@@ -1,5 +1,5 @@
 /**
- * Video processing utilities for client-side thumbnail generation
+ * Video processing utilities for client-side thumbnail generation and metadata extraction
  */
 
 import { videoLogger } from './logger';
@@ -9,6 +9,7 @@ interface VideoMetadata {
   width: number;
   height: number;
   size: number;
+  // Note: Enhanced metadata fields are no longer available since MediaInfo.js has been removed
 }
 
 interface ThumbnailGenerationResult {
@@ -52,6 +53,21 @@ async function checkBrowserCompatibility(): Promise<boolean> {
     videoLogger.warn('Browser compatibility check failed', { error: error instanceof Error ? error.message : 'Unknown error' });
     return false;
   }
+}
+
+/**
+ * Extract video metadata using HTML5 video element
+ */
+export async function extractVideoMetadataWithMediaInfo(
+  videoFile: File,
+  options: VideoProcessingOptions = {}
+): Promise<VideoMetadata> {
+  // MediaInfo.js has been removed - using HTML5 video element for all video processing
+  videoLogger.info('Using HTML5 video element for metadata extraction', {
+    filename: videoFile.name
+  });
+  
+  return extractVideoMetadata(videoFile, options);
 }
 
 /**

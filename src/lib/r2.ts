@@ -280,8 +280,6 @@ export async function deleteFromR2(key: string): Promise<void> {
   }
 }
 
-
-
 /**
  * Generate file paths for different types of content
  */
@@ -292,7 +290,7 @@ export const generateFilePath = {
   original: (date: Date, filename: string): string => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const timestamp = Date.now();
+    const timestamp = Math.floor(date.getTime() / 1000); // Use provided date in seconds, not current time
     return `originals/${year}/${month}/${timestamp}_${filename}`;
   },
 

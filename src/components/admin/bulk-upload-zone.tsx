@@ -25,10 +25,10 @@ import {
 } from 'lucide-react';
 import type { UploadFile } from '@/types/upload';
 import { extractExifMetadata } from '@/lib/exif';
-import { generateVideoThumbnail } from '@/lib/video-processing';
 import type { MediaMetadata } from '@/types/media';
 import { uploadLogger, exifLogger } from '@/lib/logger';
 import { authenticatedFetch } from '@/lib/api-client';
+import { PrivacySelector } from '@/components/upload/privacy-selector';
 
 interface BulkUploadZoneProps {
   availableTags: string[];
@@ -43,6 +43,7 @@ interface UploadState {
   newTag: string;
   showTagDialog: boolean;
   overallProgress: number;
+  privacy: 'public' | 'family' | 'extended-family' | 'private';
 }
 
 // Extended UploadFile interface to include image thumbnail
@@ -118,7 +119,8 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
     selectedTags: [],
     newTag: '',
     showTagDialog: false,
-    overallProgress: 0
+    overallProgress: 0,
+    privacy: 'family'
   });
 
   const handleFileSelect = useCallback(async (selectedFiles: FileList | File[]) => {
@@ -198,6 +200,8 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
         }
       } else if (uploadFile.file.type.startsWith('video/')) {
         try {
+          // Dynamically import video processing to avoid build-time WASM issues
+          const { generateVideoThumbnail } = await import('@/lib/video-processing');
           const thumbnailResult = await generateVideoThumbnail(uploadFile.file, {
             thumbnailWidth: 320,
             thumbnailHeight: 240,
@@ -335,6 +339,7 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
           formData.append('file', uploadFile.file);
           formData.append('userId', userId || 'unknown');
           formData.append('tags', JSON.stringify(state.selectedTags));
+          formData.append('visibility', state.privacy);
           
           // Add video metadata if available
           if (uploadFile.videoMetadata) {
@@ -470,13 +475,14 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
           // Generate a unique ID for the media
           const mediaId = self.crypto?.randomUUID?.() || Math.random().toString(36).substring(2) + Date.now().toString(36);
           
-          // Create metadata using the properly processed metadata with selected tags
+          // Create metadata using the properly processed metadata with selected tags and privacy
           const mediaMetadata: MediaMetadata = {
             ...processedMetadata,
             id: mediaId,
             path: filePath,
             thumbnailPath: fileNaming.thumbnailPath,
             tags: state.selectedTags,
+            visibility: state.privacy,
             metadata: {
               ...processedMetadata.metadata,
               hash
@@ -658,64 +664,73 @@ export function BulkUploadZone({ availableTags, onUploadComplete, onTagsUpdate }
         </CardContent>
       </Card>
 
-      {/* Bulk Tagging */}
+      {/* Bulk Settings */}
       {state.files.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Tags className="h-5 w-5" />
-              Bulk Tagging
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label>Selected Tags (will be applied to all uploads)</Label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {state.selectedTags.map(tag => (
-                  <Badge key={tag} variant="default" className="flex items-center gap-1">
-                    {tag}
-                    <X 
-                      className="h-3 w-3 cursor-pointer" 
-                      onClick={() => handleRemoveTag(tag)}
-                    />
-                  </Badge>
-                ))}
-                {state.selectedTags.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No tags selected</p>
-                )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Bulk Tagging */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Tags className="h-5 w-5" />
+                Bulk Tagging
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Selected Tags (will be applied to all uploads)</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {state.selectedTags.map(tag => (
+                    <Badge key={tag} variant="default" className="flex items-center gap-1">
+                      {tag}
+                      <X 
+                        className="h-3 w-3 cursor-pointer" 
+                        onClick={() => handleRemoveTag(tag)}
+                      />
+                    </Badge>
+                  ))}
+                  {state.selectedTags.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No tags selected</p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="flex gap-2">
-              <Input
-                placeholder="Add new tag..."
-                value={state.newTag}
-                onChange={(e) => setState(prev => ({ ...prev, newTag: e.target.value }))}
-                onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
-                className="flex-1"
-              />
-              <Button onClick={handleAddTag} disabled={!state.newTag.trim()}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div>
-              <Label>Available Tags</Label>
-              <div className="flex flex-wrap gap-2 mt-2 max-h-32 overflow-y-auto">
-                {availableTags.map(tag => (
-                  <Badge
-                    key={tag}
-                    variant={state.selectedTags.includes(tag) ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => handleTagToggle(tag)}
-                  >
-                    {tag}
-                  </Badge>
-                ))}
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Add new tag..."
+                  value={state.newTag}
+                  onChange={(e) => setState(prev => ({ ...prev, newTag: e.target.value }))}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
+                  className="flex-1"
+                />
+                <Button onClick={handleAddTag} disabled={!state.newTag.trim()}>
+                  <Plus className="h-4 w-4" />
+                </Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+
+              <div>
+                <Label>Available Tags</Label>
+                <div className="flex flex-wrap gap-2 mt-2 max-h-32 overflow-y-auto">
+                  {availableTags.map(tag => (
+                    <Badge
+                      key={tag}
+                      variant={state.selectedTags.includes(tag) ? "default" : "outline"}
+                      className="cursor-pointer"
+                      onClick={() => handleTagToggle(tag)}
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Privacy Settings */}
+          <PrivacySelector
+            value={state.privacy}
+            onChange={(privacy) => setState(prev => ({ ...prev, privacy }))}
+          />
+        </div>
       )}
 
       {/* Upload Queue */}

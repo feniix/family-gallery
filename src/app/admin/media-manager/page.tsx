@@ -46,7 +46,8 @@ import {
   CheckSquare,
   Square,
   Eye,
-  Play
+  Play,
+  Lock
 } from 'lucide-react';
 import { PhotoCard } from '@/components/gallery/photo-card';
 import { BulkUploadZone } from '@/components/admin/bulk-upload-zone';
@@ -97,7 +98,7 @@ export default function MediaManagerPage() {
 
   const [bulkDialog, setBulkDialog] = useState<{
     open: boolean;
-    action: 'delete' | 'add-tags' | 'remove-tags' | 'set-tags' | null;
+    action: 'delete' | 'add-tags' | 'remove-tags' | 'set-tags' | 'set-private' | 'set-family' | null;
   }>({
     open: false,
     action: null
@@ -176,7 +177,7 @@ export default function MediaManagerPage() {
     }
   };
 
-  const handleBulkOperation = async (action: 'delete' | 'add-tags' | 'remove-tags' | 'set-tags', tags?: string[]) => {
+  const handleBulkOperation = async (action: 'delete' | 'add-tags' | 'remove-tags' | 'set-tags' | 'set-private' | 'set-family', tags?: string[]) => {
     const selectedIds = Array.from(state.selectedItems);
     
     if (selectedIds.length === 0) {
@@ -185,6 +186,43 @@ export default function MediaManagerPage() {
     }
 
     try {
+      // Handle privacy actions separately
+      if (action === 'set-private' || action === 'set-family') {
+        const visibility = action === 'set-private' ? 'private' : 'family';
+        
+        // Update each media item individually for privacy
+        const results = await Promise.allSettled(
+          selectedIds.map(mediaId => 
+            authenticatedFetch('/api/media/visibility', {
+              method: 'PUT',
+              body: JSON.stringify({
+                mediaId,
+                visibility
+              })
+            })
+          )
+        );
+        
+        const successCount = results.filter(r => r.status === 'fulfilled').length;
+        const failureCount = results.length - successCount;
+        
+        if (successCount > 0) {
+          toast.success(`${successCount} items updated to ${visibility}`);
+          if (failureCount > 0) {
+            toast.warning(`${failureCount} items failed to update`);
+          }
+          // Reload data to get updated visibility
+          await loadMediaAndTags();
+          setState(prev => ({ ...prev, selectedItems: new Set() }));
+        } else {
+          toast.error('Failed to update privacy settings');
+        }
+        
+        setBulkDialog({ open: false, action: null });
+        return;
+      }
+      
+      // Handle other bulk operations
       const body: {
         action: string;
         mediaIds: string[];
@@ -474,6 +512,36 @@ export default function MediaManagerPage() {
     }));
   };
 
+  const handlePrivacyChange = async (mediaId: string, newVisibility: 'public' | 'family' | 'extended-family' | 'private') => {
+    try {
+      const response = await authenticatedFetch(`/api/media/${mediaId}/visibility`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ visibility: newVisibility }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update visibility');
+      }
+
+      setState(prev => ({
+        ...prev,
+        media: prev.media.map(m => 
+          m.id === mediaId ? { ...m, visibility: newVisibility } : m
+        )
+      }));
+    } catch (error) {
+      apiLogger.error('Error updating privacy', { 
+        mediaId: mediaId,
+        newVisibility: newVisibility,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      toast.error('Failed to update privacy');
+    }
+  };
+
   if (!isLoaded) {
     return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
@@ -630,6 +698,25 @@ export default function MediaManagerPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setBulkDialog({ open: true, action: 'set-tags' })}>
                             Set Tags
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline">
+                            <Lock className="h-4 w-4 mr-2" />
+                            Privacy
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem onClick={() => setBulkDialog({ open: true, action: 'set-private' })}>
+                            <Lock className="h-4 w-4 mr-2" />
+                            Mark as Private
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setBulkDialog({ open: true, action: 'set-family' })}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            Make Visible to Family
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -799,6 +886,8 @@ export default function MediaManagerPage() {
                           onClick={() => handleOpenLightbox(media)}
                           aspectRatio="square"
                           priority={true}
+                          showPrivacyControls={true}
+                          onPrivacyChange={handlePrivacyChange}
                         />
                         
                         {/* Overlay for video */}
@@ -950,7 +1039,7 @@ export default function MediaManagerPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Bulk Tag Operations Dialog */}
+      {/* Bulk Operations Dialog */}
       <Dialog open={bulkDialog.open} onOpenChange={(open) => setBulkDialog({ open, action: null })}>
         <DialogContent>
           <DialogHeader>
@@ -958,50 +1047,81 @@ export default function MediaManagerPage() {
               {bulkDialog.action === 'add-tags' && 'Add Tags to Selected Items'}
               {bulkDialog.action === 'remove-tags' && 'Remove Tags from Selected Items'}
               {bulkDialog.action === 'set-tags' && 'Set Tags for Selected Items'}
+              {bulkDialog.action === 'set-private' && 'Mark Selected Items as Private'}
+              {bulkDialog.action === 'set-family' && 'Make Selected Items Visible to Family'}
             </DialogTitle>
             <DialogDescription>
               This will affect {state.selectedItems.size} selected media items.
+              {bulkDialog.action === 'set-private' && ' Private items will only be visible to admins.'}
+              {bulkDialog.action === 'set-family' && ' Items will be visible to family members.'}
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4">
-            <Label>Select Tags</Label>
-            <div className="flex flex-wrap gap-2">
-              {state.availableTags.map(tag => (
-                <Badge
-                  key={tag}
-                  variant={bulkTags.includes(tag) ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => {
-                    setBulkTags(prev => 
-                      prev.includes(tag) 
-                        ? prev.filter(t => t !== tag)
-                        : [...prev, tag]
-                    );
-                  }}
-                >
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-            
-            {bulkTags.length > 0 && (
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm font-medium">Selected tags:</p>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {bulkTags.map(tag => (
-                    <Badge key={tag} variant="default">
-                      {tag}
-                      <X 
-                        className="h-3 w-3 ml-1 cursor-pointer" 
-                        onClick={() => setBulkTags(prev => prev.filter(t => t !== tag))}
-                      />
-                    </Badge>
-                  ))}
-                </div>
+          {/* Tag selection for tag operations */}
+          {(bulkDialog.action === 'add-tags' || bulkDialog.action === 'remove-tags' || bulkDialog.action === 'set-tags') && (
+            <div className="space-y-4">
+              <Label>Select Tags</Label>
+              <div className="flex flex-wrap gap-2">
+                {state.availableTags.map(tag => (
+                  <Badge
+                    key={tag}
+                    variant={bulkTags.includes(tag) ? "default" : "outline"}
+                    className="cursor-pointer"
+                    onClick={() => {
+                      setBulkTags(prev => 
+                        prev.includes(tag) 
+                          ? prev.filter(t => t !== tag)
+                          : [...prev, tag]
+                      );
+                    }}
+                  >
+                    {tag}
+                  </Badge>
+                ))}
               </div>
-            )}
-          </div>
+              
+              {bulkTags.length > 0 && (
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm font-medium">Selected tags:</p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {bulkTags.map(tag => (
+                      <Badge key={tag} variant="default">
+                        {tag}
+                        <X 
+                          className="h-3 w-3 ml-1 cursor-pointer" 
+                          onClick={() => setBulkTags(prev => prev.filter(t => t !== tag))}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Privacy confirmation */}
+          {(bulkDialog.action === 'set-private' || bulkDialog.action === 'set-family') && (
+            <div className="space-y-4">
+              <div className="p-4 bg-muted rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  {bulkDialog.action === 'set-private' ? (
+                    <Lock className="h-5 w-5 text-red-500" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-blue-500" />
+                  )}
+                  <p className="font-medium">
+                    {bulkDialog.action === 'set-private' ? 'Mark as Private' : 'Make Visible to Family'}
+                  </p>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {bulkDialog.action === 'set-private' 
+                    ? 'These items will only be visible to administrators. Family members will not see them in the gallery.'
+                    : 'These items will be visible to all family members in the gallery.'
+                  }
+                </p>
+              </div>
+            </div>
+          )}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkDialog({ open: false, action: null })}>
@@ -1009,9 +1129,16 @@ export default function MediaManagerPage() {
             </Button>
             <Button 
               onClick={() => bulkDialog.action && handleBulkOperation(bulkDialog.action, bulkTags)}
-              disabled={bulkTags.length === 0}
+              disabled={
+                (bulkDialog.action === 'add-tags' || bulkDialog.action === 'remove-tags' || bulkDialog.action === 'set-tags') 
+                  ? bulkTags.length === 0 
+                  : false
+              }
+              variant={bulkDialog.action === 'set-private' ? 'destructive' : 'default'}
             >
-              Apply Changes
+              {bulkDialog.action === 'set-private' && 'Mark as Private'}
+              {bulkDialog.action === 'set-family' && 'Make Visible to Family'}
+              {(bulkDialog.action === 'add-tags' || bulkDialog.action === 'remove-tags' || bulkDialog.action === 'set-tags') && 'Apply Changes'}
             </Button>
           </DialogFooter>
         </DialogContent>

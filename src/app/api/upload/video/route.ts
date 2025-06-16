@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
     const tagsJson = formData.get('tags') as string;
     const videoMetadataJson = formData.get('videoMetadata') as string;
     const thumbnailFile = formData.get('thumbnail') as File;
+    const visibility = formData.get('visibility') as string;
     
     uploadLogger.info('FormData contents extracted', {
       hasFile: !!file,
@@ -69,12 +70,43 @@ export async function POST(request: NextRequest) {
     // For now, handle video uploads without transaction system to avoid browser API issues
     // TODO: Implement proper server-side video processing or client-side thumbnail generation
     
-    // Generate basic metadata
-    const takenAt = new Date().toISOString();
-    const year = new Date().getFullYear();
-    const timestamp = Date.now();
+    // Process video metadata to extract creation date if available
+    let takenAtDate: Date;
+    let dateSource: 'exif' | 'filename' | 'file-creation' | 'upload-time' = 'upload-time';
+    let confidence: 'high' | 'medium' | 'low' = 'low';
+    
+    try {
+      // Use the enhanced metadata processing for videos
+      const { processMediaMetadata } = await import('@/lib/metadata');
+      const { metadata: processedMetadata } = await processMediaMetadata(file, userIdFromForm || userId, 'web');
+      
+      takenAtDate = new Date(processedMetadata.takenAt);
+      dateSource = processedMetadata.dateInfo.source;
+      confidence = processedMetadata.dateInfo.confidence;
+      
+      uploadLogger.info('Extracted video date metadata', {
+        filename: file.name,
+        takenAt: takenAtDate.toISOString(),
+        source: dateSource,
+        confidence
+      });
+    } catch (error) {
+      uploadLogger.warn('Failed to process video metadata, using upload time', { 
+        filename: file.name, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+      // Fallback to upload time
+      takenAtDate = new Date();
+      dateSource = 'upload-time';
+      confidence = 'low';
+    }
+    
+    const takenAt = takenAtDate.toISOString();
+    const year = takenAtDate.getFullYear();
+    const month = String(takenAtDate.getMonth() + 1).padStart(2, '0');
+    const timestamp = Math.floor(takenAtDate.getTime() / 1000); // Use seconds like photos
     const filename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filePath = `originals/${year}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${timestamp}_${filename}`;
+    const filePath = `originals/${year}/${month}/${timestamp}_${filename}`;
     
     // Get presigned URL for video upload
     uploadLogger.info('Generating presigned URL', { filePath, fileType: file.type });
@@ -102,7 +134,7 @@ export async function POST(request: NextRequest) {
     // Upload thumbnail if provided
     let thumbnailPath = '';
     if (thumbnailFile && thumbnailFile.size > 0) {
-      thumbnailPath = `thumbnails/${year}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${timestamp}_thumbnail.jpg`;
+      thumbnailPath = `thumbnails/${year}/${month}/${timestamp}_thumbnail.jpg`;
       const thumbnailPresignedUrl = await generatePresignedUploadUrl(thumbnailPath, 'image/jpeg');
       
       const thumbnailUploadResponse = await fetch(thumbnailPresignedUrl, {
@@ -132,8 +164,8 @@ export async function POST(request: NextRequest) {
       uploadSource: 'web' as const,
       takenAt,
       dateInfo: {
-        source: 'upload-time' as const,
-        confidence: 'low' as const,
+        source: dateSource,
+        confidence,
       },
       metadata: {
         size: file.size,
@@ -144,6 +176,7 @@ export async function POST(request: NextRequest) {
       },
       ...(thumbnailPath && { thumbnailPath }),
       tags: tags,
+      visibility: (visibility as 'public' | 'family' | 'extended-family' | 'private') || 'family',
       hasValidExif: false,
     };
     

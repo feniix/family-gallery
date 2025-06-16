@@ -11,16 +11,29 @@ function formatDate(date: Date): string {
  */
 export async function processDateWithFallbacks(
   file: File,
-  exifData?: ExifMetadata | null
+  exifData?: ExifMetadata | null,
+  videoMetadata?: { 
+    creationDate?: Date; 
+    width?: number; 
+    height?: number; 
+    duration?: number;
+    codec?: string;
+    bitrate?: number;
+    framerate?: number;
+    camera?: string;
+    software?: string;
+    location?: { lat: number; lng: number };
+  } | null
 ): Promise<DateProcessingResult> {
   uploadLogger.debug('Processing date for file', {
     fileName: file.name,
     fileSize: file.size,
     lastModified: file.lastModified,
-    hasMetadata: !!exifData
+    hasMetadata: !!exifData,
+    hasVideoMetadata: !!videoMetadata
   });
 
-  // Strategy 1: Use EXIF DateTimeOriginal (highest priority)
+  // Strategy 1: Use EXIF DateTimeOriginal (highest priority for images)
   if (exifData?.dateTimeOriginal) {
     uploadLogger.debug('Using EXIF DateTimeOriginal', { 
       fileName: file.name, 
@@ -31,6 +44,19 @@ export async function processDateWithFallbacks(
       dateSource: 'exif',
       confidence: 'high',
       timezone: extractTimezoneFromExif(exifData),
+    };
+  }
+
+  // Strategy 1.5: Use video creation date (highest priority for videos)
+  if (videoMetadata?.creationDate) {
+    uploadLogger.debug('Using video creation date', { 
+      fileName: file.name, 
+      date: videoMetadata.creationDate 
+    });
+    return {
+      takenAt: videoMetadata.creationDate,
+      dateSource: 'exif', // Use 'exif' as it represents metadata extraction
+      confidence: 'high',
     };
   }
   

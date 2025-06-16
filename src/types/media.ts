@@ -109,6 +109,10 @@ export interface MediaMetadata {
   };
   tags: string[];
   thumbnailPath?: string;
+  // Privacy and access control
+  visibility?: 'public' | 'family' | 'extended-family' | 'private';
+  allowedUsers?: string;
+  restrictedUsers?: string;
   // File processing flags
   isScreenshot?: boolean;
   isEdited?: boolean;
@@ -185,4 +189,13 @@ export interface FileValidation {
   isValid: boolean;
   type: 'image' | 'video' | 'unknown';
   error?: string;
+}
+
+export interface VideoMetadata {
+  duration: number;
+  width: number;
+  height: number;
+  size: number;
+  // Note: Enhanced metadata fields (codec, bitrate, framerate, camera, software, location, creationDate) 
+  // are no longer available since MediaInfo.js has been removed
 } 

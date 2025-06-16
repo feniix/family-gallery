@@ -62,6 +62,9 @@ export function useSignedUrl({
 
   const fetchSignedUrl = useCallback(async () => {
     if (!enabled || !mediaId) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('useSignedUrl: Skipping fetch', { enabled, mediaId, isThumbnail });
+      }
       return;
     }
 
@@ -69,11 +72,18 @@ export function useSignedUrl({
       setLoading(true);
       setError(null);
 
+      if (process.env.NODE_ENV === 'development') {
+        console.log('useSignedUrl: Starting fetch', { mediaId, isThumbnail, cacheKey });
+      }
+
       // Check cache first
       const cached = signedUrlCache.get(cacheKey);
       const now = new Date();
       
       if (cached && cached.expiresAt > new Date(now.getTime() + refreshBuffer * 1000)) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('useSignedUrl: Using cached URL', { mediaId, isThumbnail, cachedUrl: cached.url });
+        }
         setUrl(cached.url);
         setLoading(false);
         
@@ -90,16 +100,33 @@ export function useSignedUrl({
       if (isThumbnail) params.set('thumbnail', 'true');
       if (expiresIn !== 3600) params.set('expires', expiresIn.toString());
 
-      const url = `/api/media/signed-url/${mediaId}?${params.toString()}`;
+      const apiUrl = `/api/media/signed-url/${mediaId}?${params.toString()}`;
       
-      const response = await authenticatedFetch(url);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('useSignedUrl: Fetching from API', { apiUrl, mediaId, isThumbnail });
+      }
+      
+      const response = await authenticatedFetch(apiUrl);
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
-        throw new Error(`Failed to get signed URL (${response.status}): ${errorText}`);
+        const errorMsg = `Failed to get signed URL (${response.status}): ${errorText}`;
+        if (process.env.NODE_ENV === 'development') {
+          console.error('useSignedUrl: API Error', { mediaId, isThumbnail, status: response.status, errorText });
+        }
+        throw new Error(errorMsg);
       }
 
       const data: SignedUrlResponse = await response.json();
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('useSignedUrl: API Success', { 
+          mediaId, 
+          isThumbnail, 
+          signedUrl: data.signedUrl,
+          expiresAt: data.expiresAt 
+        });
+      }
       
       // Cache the result
       const expiresAt = new Date(data.expiresAt);
@@ -120,8 +147,10 @@ export function useSignedUrl({
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to get signed URL';
+      if (process.env.NODE_ENV === 'development') {
+        console.error('useSignedUrl: Fetch Error', { mediaId, isThumbnail, error: errorMessage, err });
+      }
       setError(errorMessage);
-      console.error('Error fetching signed URL:', err);
     } finally {
       setLoading(false);
     }

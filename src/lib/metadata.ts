@@ -33,6 +33,19 @@ export async function processMediaMetadata(
   
   // Use pre-extracted EXIF data if provided, otherwise extract it
   let exifData: ExifMetadata | null = null;
+  let videoMetadata: { 
+    creationDate?: Date; 
+    width?: number; 
+    height?: number; 
+    duration?: number;
+    codec?: string;
+    bitrate?: number;
+    framerate?: number;
+    camera?: string;
+    software?: string;
+    location?: { lat: number; lng: number };
+  } | null = null;
+  
   if (preExtractedExifData !== undefined) {
     exifData = preExtractedExifData;
     uploadLogger.debug(`Using pre-extracted EXIF data`, { 
@@ -43,10 +56,45 @@ export async function processMediaMetadata(
     });
   } else if (file.type.startsWith('image/')) {
     exifData = await extractExifMetadata(file);
+  } else if (file.type.startsWith('video/')) {
+    // Extract video metadata including creation date using MediaInfo.js
+    try {
+      const { extractVideoMetadataWithMediaInfo } = await import('@/lib/video-processing');
+      videoMetadata = await extractVideoMetadataWithMediaInfo(file);
+      uploadLogger.debug(`Extracted video metadata with MediaInfo`, { 
+        filename: file.name,
+        hasCreationDate: !!videoMetadata?.creationDate,
+        duration: videoMetadata?.duration,
+        dimensions: videoMetadata?.width && videoMetadata?.height ? `${videoMetadata.width}x${videoMetadata.height}` : 'unknown',
+        codec: videoMetadata?.codec,
+        camera: videoMetadata?.camera
+      });
+    } catch (error) {
+      uploadLogger.warn('Failed to extract video metadata with MediaInfo, trying fallback', { 
+        filename: file.name, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+      
+      // Fallback to basic HTML5 video element extraction
+      try {
+        videoMetadata = await extractVideoMetadataWithDate(file);
+        uploadLogger.debug(`Extracted video metadata with HTML5 fallback`, { 
+          filename: file.name,
+          hasCreationDate: !!videoMetadata?.creationDate,
+          duration: videoMetadata?.duration
+        });
+      } catch (fallbackError) {
+        uploadLogger.error('All video metadata extraction methods failed', { 
+          filename: file.name, 
+          error: fallbackError instanceof Error ? fallbackError.message : 'Unknown error' 
+        });
+        videoMetadata = null;
+      }
+    }
   }
   
   // Process date with fallback strategies
-  const dateResult = await processDateWithFallbacks(file, exifData || undefined);
+  const dateResult = await processDateWithFallbacks(file, exifData || undefined, videoMetadata);
   
   // Generate unique filename and path
   const fileNaming = generateUniqueFilename(file.name, dateResult.takenAt);
@@ -74,18 +122,34 @@ export async function processMediaMetadata(
       hash,
       // Add EXIF data if available
       ...(exifData && { exif: exifData }),
-      // Add GPS location if available in EXIF
+      // Add video metadata if available
+      ...(videoMetadata?.width && { width: videoMetadata.width }),
+      ...(videoMetadata?.height && { height: videoMetadata.height }),
+      ...(videoMetadata?.duration && { duration: videoMetadata.duration }),
+      ...(videoMetadata?.codec && { videoCodec: videoMetadata.codec }),
+      ...(videoMetadata?.bitrate && { bitrate: videoMetadata.bitrate }),
+      ...(videoMetadata?.framerate && { framerate: videoMetadata.framerate }),
+      // Add GPS location from video metadata if available
+      ...(videoMetadata?.location && {
+        location: {
+          lat: videoMetadata.location.lat,
+          lng: videoMetadata.location.lng,
+        },
+      }),
+      // Add GPS location from EXIF if available (for images)
       ...(exifData?.gps && {
         location: {
           lat: exifData.gps.latitude,
           lng: exifData.gps.longitude,
         },
       }),
-      // Add camera info if available
+      // Add camera info from video metadata if available
+      ...(videoMetadata?.camera && { camera: videoMetadata.camera }),
+      // Add camera info from EXIF if available (for images)
       ...(exifData?.make && exifData?.model && {
         camera: `${exifData.make} ${exifData.model}`,
       }),
-      // Add dimensions if available
+      // Add dimensions if available from EXIF
       ...(exifData?.pixelXDimension && { width: exifData.pixelXDimension }),
       ...(exifData?.pixelYDimension && { height: exifData.pixelYDimension }),
     },
@@ -111,7 +175,64 @@ export async function processMediaMetadata(
   };
 }
 
-// Hash generation function is now imported from shared utilities
+/**
+ * Extract video metadata including creation date using HTML5 video element
+ * Note: Browser APIs have limited access to video metadata, especially creation dates
+ */
+async function extractVideoMetadataWithDate(file: File): Promise<{
+  width?: number;
+  height?: number;
+  duration?: number;
+  creationDate?: Date;
+}> {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    const url = URL.createObjectURL(file);
+    
+    video.addEventListener('loadedmetadata', () => {
+      const metadata = {
+        width: video.videoWidth || undefined,
+        height: video.videoHeight || undefined,
+        duration: video.duration || undefined,
+        // Note: Browser APIs don't provide access to video creation date
+        // We would need server-side processing with ffprobe or similar tools
+        creationDate: undefined as Date | undefined,
+      };
+      
+      // Try to extract creation date from file's lastModified as fallback
+      // This is not the actual video creation date, but file system date
+      if (file.lastModified) {
+        const fileDate = new Date(file.lastModified);
+        // Only use if it seems reasonable (not too old, not in future)
+        const now = new Date();
+        const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+        const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+        
+        if (fileDate >= oneYearAgo && fileDate <= oneHourFromNow) {
+          metadata.creationDate = fileDate;
+        }
+      }
+      
+      URL.revokeObjectURL(url);
+      resolve(metadata);
+    });
+    
+    video.addEventListener('error', () => {
+      uploadLogger.error('Failed to extract video metadata', { filename: file.name });
+      URL.revokeObjectURL(url);
+      resolve({});
+    });
+    
+    video.src = url;
+    video.load();
+    
+    // Timeout after 10 seconds
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      resolve({});
+    }, 10000);
+  });
+}
 
 /**
  * Extract video metadata using HTML5 video element

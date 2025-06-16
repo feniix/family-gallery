@@ -105,6 +105,7 @@ export async function GET(
         mediaId: id,
         filename: mediaItem.originalFilename,
         isThumbnail,
+        filePath,
         expiresIn: actualExpiration,
         userId
       });
@@ -122,6 +123,7 @@ export async function GET(
       apiLogger.error('Error generating signed URL', {
         mediaId: id,
         filePath,
+        isThumbnail,
         error: error instanceof Error ? error.message : error
       });
       return NextResponse.json({ error: 'Failed to generate signed URL' }, { status: 500 });
