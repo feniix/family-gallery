@@ -798,6 +798,7 @@ export default function MediaManagerPage() {
                           media={media}
                           onClick={() => handleOpenLightbox(media)}
                           aspectRatio="square"
+                          priority={true}
                         />
                         
                         {/* Overlay for video */}

@@ -34,15 +34,17 @@ export function PhotoCard({ media, onClick, priority = false, aspectRatio = 'nat
       console.log('📷 PhotoCard state:', {
         mediaId: media.id,
         filename: media.originalFilename,
+        thumbnailPath: media.thumbnailPath,
         thumbnailUrl: thumbnailUrl ? `URL received (${thumbnailUrl.substring(0, 50)}...)` : 'No URL',
         thumbnailLoading,
         thumbnailError: thumbnailError ? (typeof thumbnailError === 'string' ? thumbnailError : 'Unknown error') : null,
         priority,
         isIntersecting,
-        imageError
+        imageError,
+        hookEnabled: priority || isIntersecting
       });
     }
-  }, [media.id, media.originalFilename, thumbnailUrl, thumbnailLoading, thumbnailError, priority, isIntersecting, imageError]);
+  }, [media.id, media.originalFilename, media.thumbnailPath, thumbnailUrl, thumbnailLoading, thumbnailError, priority, isIntersecting, imageError]);
 
   const isVideo = media.type === 'video';
 

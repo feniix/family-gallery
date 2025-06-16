@@ -61,7 +61,16 @@ export function useSignedUrl({
   const cacheKey = `${mediaId}_${isThumbnail ? 'thumb' : 'full'}`;
 
   const fetchSignedUrl = useCallback(async () => {
-    if (!enabled || !mediaId) return;
+    if (!enabled || !mediaId) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔗 useSignedUrl: Skipping fetch', { enabled, mediaId, isThumbnail });
+      }
+      return;
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔗 useSignedUrl: Starting fetch', { mediaId, isThumbnail, enabled });
+    }
 
     try {
       setLoading(true);
@@ -88,12 +97,24 @@ export function useSignedUrl({
       if (isThumbnail) params.set('thumbnail', 'true');
       if (expiresIn !== 3600) params.set('expires', expiresIn.toString());
 
-      const response = await authenticatedFetch(
-        `/api/media/signed-url/${mediaId}?${params.toString()}`
-      );
+      const url = `/api/media/signed-url/${mediaId}?${params.toString()}`;
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔗 useSignedUrl: Making API call', { url, mediaId, isThumbnail });
+      }
+
+      const response = await authenticatedFetch(url);
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
+        if (process.env.NODE_ENV === 'development') {
+          console.error('🔗 useSignedUrl: API call failed', { 
+            status: response.status, 
+            statusText: response.statusText,
+            errorText,
+            url 
+          });
+        }
         throw new Error(`Failed to get signed URL (${response.status}): ${errorText}`);
       }
 
