@@ -779,7 +779,7 @@ export default function MediaManagerPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {filteredMedia.map(media => (
                     <Card key={media.id} className="overflow-hidden group hover:shadow-lg transition-shadow">
-                      <div className="aspect-video bg-muted relative overflow-hidden cursor-pointer" onClick={() => handleOpenLightbox(media)}>
+                      <div className="aspect-square bg-muted relative overflow-hidden cursor-pointer" onClick={() => handleOpenLightbox(media)}>
                         {state.bulkMode && (
                           <div 
                             className="absolute top-2 left-2 z-10"
@@ -793,22 +793,12 @@ export default function MediaManagerPage() {
                           </div>
                         )}
                         
-                          {/* Media Thumbnail with signed URL support */}
-                          {media.type === 'photo' ? (
-                            <PhotoCard
-                              media={media}
-                              onClick={() => handleOpenLightbox(media)}
-                              aspectRatio="square"
-                            />
-                          ) : (
-                            <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                              <PhotoCard
-                                media={media}
-                                onClick={() => handleOpenLightbox(media)}
-                                aspectRatio="square"
-                              />
-                            </div>
-                          )}
+                        {/* Media Thumbnail with signed URL support */}
+                        <PhotoCard
+                          media={media}
+                          onClick={() => handleOpenLightbox(media)}
+                          aspectRatio="square"
+                        />
                         
                         {/* Overlay for video */}
                         {media.type === 'video' && (
