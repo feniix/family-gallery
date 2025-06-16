@@ -154,7 +154,7 @@ export async function GET() {
         .slice(0, 10);
 
       stats.users.recentUsers = sortedUsers.map(user => ({
-        id: user.email, // Using email as ID for display
+        id: user.id, // Using actual user ID to avoid duplicates
         email: user.email,
         name: user.name || 'Unknown',
         role: user.role,
